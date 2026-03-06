@@ -2,9 +2,17 @@
 
 A practical guide to building your own digital ecosystem using self-hosted services.
 
-This manual shows step-by-step how to create a personal digital infrastructure based on Docker, including photo management, music streaming, private cloud storage, and local AI.
+This manual shows step by step how to create a personal digital infrastructure based on Docker, including photo management, music streaming, private cloud storage, and local AI.
 
 The goal is **practical digital sovereignty**: running your own services and keeping control over your data.
+
+---
+
+## Read the manual
+
+The latest compiled version of the manual is available here:
+
+[Open or download the latest PDF](https://mattispin.github.io/digital-sovereignty-manual/)
 
 ---
 
@@ -17,19 +25,7 @@ The goal is **practical digital sovereignty**: running your own services and kee
 - Navidrome music streaming
 - Local AI with Ollama + Open WebUI
 - Private cloud with Nextcloud and Seafile
-- Maintenance, updates, backups and logs
-
----
-
-## Download
-
-[Read or download the latest compiled PDF](https://mattispin.github.io/digital-sovereignty-manual/)
-
-## Read the manual
-
-The latest compiled version of the manual is available here:
-
-[Open the manual (GitHub Pages)](https://mattispin.github.io/digital-sovereignty-manual/)
+- Maintenance, updates, backups, and logs
 
 ---
 
@@ -38,7 +34,7 @@ The latest compiled version of the manual is available here:
 The idea behind this project is simple:
 
 Modern digital life depends heavily on centralized platforms.  
-However, with relatively simple tools it is possible to build a personal infrastructure that restores control over data, services, and digital workflows.
+However, with relatively simple tools, it is possible to build a personal infrastructure that restores control over data, services, and digital workflows.
 
 This manual documents that process so that **any technically curious person can reproduce it**.
 
