@@ -16,6 +16,19 @@ The latest compiled version of the manual is available here:
 
 ---
 
+## DOI and citation
+
+Archived version of the manual on Zenodo:
+
+[https://doi.org/10.5281/zenodo.18890858](https://doi.org/10.5281/zenodo.18890858)
+
+Version: v1.0.0
+
+The Zenodo archive contains the full source of the manual corresponding to release v1.0.0, including LaTeX files, chapters, figures, and project files:
+
+
+----
+
 ## What this manual covers
 
 - Linux server setup
