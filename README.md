@@ -16,16 +16,15 @@ The latest compiled version of the manual is available here:
 
 ---
 
-## DOI and citation
+## DOI and archived source
 
-Archived version of the manual on Zenodo:
+The archived citable version of the manual is available on Zenodo:
 
 [https://doi.org/10.5281/zenodo.18890858](https://doi.org/10.5281/zenodo.18890858)
 
 Version: v1.0.0
 
-The Zenodo archive contains the full source of the manual corresponding to release v1.0.0, including LaTeX files, chapters, figures, and project files:
-
+This Zenodo record contains the full archived source of the manual for version v1.0.0, including LaTeX files, chapters, figures, and project files.
 
 ----
 
