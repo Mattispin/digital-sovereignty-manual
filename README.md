@@ -23,9 +23,13 @@ The goal is **practical digital sovereignty**: running your own services and kee
 
 ## Download
 
-You can download the compiled manual here:
+[Read or download the latest compiled PDF](https://mattispin.github.io/digital-sovereignty-manual/)
 
-**[Download the PDF](main.pdf)**
+## Read the manual
+
+The latest compiled version of the manual is available here:
+
+[Open the manual (GitHub Pages)](https://mattispin.github.io/digital-sovereignty-manual/)
 
 ---
 
