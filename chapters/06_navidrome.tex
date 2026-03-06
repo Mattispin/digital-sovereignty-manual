@@ -1,0 +1,252 @@
+% chapters/06_navidrome.tex
+\chapter{Navidrome: your private music server}
+\label{ch:navidrome}
+
+\begin{center}
+  \vspace{0.6cm}
+  \includegraphics[width=0.38\textwidth]{serivdor_musica_v2}
+  \vspace{0.8cm}
+\end{center}
+
+
+
+\section{Goal (what you will achieve)}
+In this chapter you will install Navidrome, a lightweight self-hosted music server.
+By the end, you will have:
+\begin{itemize}[leftmargin=*]
+  \item a web music library you can access from a browser on your network,
+  \item a clean folder layout for your music files and Navidrome data,
+  \item a simple Compose setup you can start/stop/upgrade reliably.
+\end{itemize}
+
+\encourage{This one is a morale boost: Navidrome is usually fast to deploy and feels instantly useful.}
+
+\section{What is Navidrome (plain language)}
+Navidrome is a music streaming server you run yourself. You point it to your music folder,
+it builds an index, and it serves a modern web UI. It also supports Subsonic-compatible clients
+(many mobile apps can connect to it), but you can start with the browser and keep it simple.
+
+\section{Prerequisites}
+\begin{itemize}[leftmargin=*]
+  \item Docker and Docker Compose working (Chapters 2A or 2B).
+  \item A folder with your music library (we use \texttt{/srv/music/library}).
+\end{itemize}
+
+\section{Folder layout}
+We will use:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{/srv/music/library} --- your music files (the important part)
+  \item \texttt{/srv/music/data} --- Navidrome database and cache (persistent)
+  \item \texttt{/srv/docker/compose/navidrome} --- Compose files
+\end{itemize}
+
+Create folders (Linux path; on WSL2, run inside Ubuntu):
+
+\begin{lstlisting}
+mkdir -p /srv/docker/compose/navidrome
+mkdir -p /srv/music/{library,data}
+\end{lstlisting}
+
+\encourage{Same principle as always: your music lives on disk (\texttt{/srv/music/library}), not ``inside Docker''.}
+
+\section{Step 1 --- Create the Compose project}
+Go to the Navidrome compose folder:
+
+\begin{lstlisting}
+cd /srv/docker/compose/navidrome
+\end{lstlisting}
+
+\subsection{1.1 Create a simple environment file (recommended)}
+Create \texttt{.env}:
+
+\begin{lstlisting}
+nano .env
+\end{lstlisting}
+
+Paste (you can keep defaults for now):
+
+\begin{lstlisting}
+# --- Navidrome basics ---
+ND_SCANSCHEDULE=1h
+ND_LOGLEVEL=info
+
+# --- Optional: set timezone for correct timestamps ---
+TZ=Europe/Madrid
+\end{lstlisting}
+
+\textbf{What this does:}
+\begin{itemize}[leftmargin=*]
+  \item \texttt{ND\_SCANSCHEDULE} tells Navidrome how often to scan for new files,
+  \item \texttt{TZ} helps with correct time display and logs.
+\end{itemize}
+
+\subsection{1.2 Create \texttt{docker-compose.yml}}
+Create the Compose file:
+
+\begin{lstlisting}
+nano docker-compose.yml
+\end{lstlisting}
+
+Paste:
+
+\begin{lstlisting}
+services:
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    restart: unless-stopped
+    ports:
+      - "4533:4533"
+    environment:
+      ND_SCANSCHEDULE: ${ND_SCANSCHEDULE}
+      ND_LOGLEVEL: ${ND_LOGLEVEL}
+      TZ: ${TZ}
+    volumes:
+      - /srv/music/data:/data
+      - /srv/music/library:/music:ro
+\end{lstlisting}
+
+\textbf{How to read it:}
+\begin{itemize}[leftmargin=*]
+  \item Port \texttt{4533} will be the web UI.
+  \item \texttt{/srv/music/data} stores Navidrome's database (persistent).
+  \item \texttt{/srv/music/library} is mounted as \texttt{:ro} (read-only) to protect your originals.
+\end{itemize}
+
+\encourage{Mounting the music folder as read-only is a nice beginner safety belt: the server can index and stream, but it cannot accidentally modify your files.}
+
+\section{Step 2 --- Start Navidrome}
+Start the container:
+
+\begin{lstlisting}
+docker compose up -d
+\end{lstlisting}
+
+Check status:
+
+\begin{lstlisting}
+docker ps
+\end{lstlisting}
+
+If something looks wrong, check logs:
+
+\begin{lstlisting}
+docker compose logs -f --tail=100
+\end{lstlisting}
+
+\section{Step 3 --- Open Navidrome in your browser}
+On the same machine:
+\begin{lstlisting}
+http://localhost:4533
+\end{lstlisting}
+
+From another device on the same network:
+\begin{lstlisting}
+http://SERVER_IP:4533
+\end{lstlisting}
+
+\subsection{First login}
+On the first run, Navidrome typically asks you to create an admin user in the web UI.
+
+\encourage{If you see the login/setup screen: you are done with the hard part. From here it is just adding music.}
+
+\section{Step 4 --- Add music and let it scan}
+Copy your music into:
+\begin{lstlisting}
+/srv/music/library
+\end{lstlisting}
+
+Navidrome will scan automatically according to \texttt{ND\_SCANSCHEDULE}.
+If you add a lot of files, give it some time to index them.
+
+\section{Verification checklist}
+You are done when:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{docker ps} shows \texttt{navidrome} running,
+  \item \texttt{http://localhost:4533} loads the Navidrome UI,
+  \item you can create/login to the admin user,
+  \item after adding music, albums and tracks appear.
+\end{itemize}
+
+\section{Common pitfalls (and quick fixes)}
+\subsection{1) No music appears}
+Most common causes:
+\begin{itemize}[leftmargin=*]
+  \item The library folder is empty, or you copied files to the wrong path.
+  \item The container cannot see your files because the volume path is wrong.
+\end{itemize}
+
+Quick checks:
+\begin{itemize}[leftmargin=*]
+  \item Confirm your files are in \texttt{/srv/music/library} on the host.
+  \item Confirm the container mount exists:
+\end{itemize}
+
+\begin{lstlisting}
+docker exec -it navidrome ls -la /music | head
+\end{lstlisting}
+
+\subsection{2) Permission problems}
+Because we mount the music library read-only, permission issues are usually about the data folder:
+\begin{itemize}[leftmargin=*]
+  \item Ensure \texttt{/srv/music/data} exists.
+  \item Ensure it is writable by your user (and thus by Docker):
+\end{itemize}
+
+\begin{lstlisting}
+sudo chown -R $USER:$USER /srv/music
+\end{lstlisting}
+
+\subsection{3) Port already in use}
+If port 4533 is already used by another service, change the left side of the port mapping.
+
+Example: use port 4534 on the host:
+\begin{lstlisting}
+ports:
+  - "4534:4533"
+\end{lstlisting}
+
+Then access:
+\begin{lstlisting}
+http://localhost:4534
+\end{lstlisting}
+
+\subsection{4) Access from another device does not work}
+If it works on \texttt{localhost} but not from other devices:
+\begin{itemize}[leftmargin=*]
+  \item check Windows firewall (Path B),
+  \item confirm you are using the correct IP address,
+  \item ensure both devices are on the same network (or VPN).
+\end{itemize}
+
+\section{Access from mobile and tablet}
+Navidrome works in a browser and also supports many mobile music apps.
+
+\subsection*{On the same Wi-Fi (local network)}
+On your phone/tablet browser, open:
+
+\begin{lstlisting}
+http://SERVER_IP:4533
+\end{lstlisting}
+
+\subsection*{Outside your home (recommended: VPN)}
+Connect your device to your VPN, then open the same address:
+
+\begin{lstlisting}
+http://SERVER_IP:4533
+\end{lstlisting}
+
+\subsection*{Option: use a dedicated music app (Subsonic-compatible)}
+Navidrome supports the Subsonic API, which means many mobile music players can connect to it.
+If you want that experience later, you will typically need:
+\begin{itemize}[leftmargin=*]
+  \item server address: \texttt{http://SERVER\_IP:4533}
+  \item username/password: the Navidrome user you created
+\end{itemize}
+
+\encourage{Browser access is the simplest path. Once everything works, dedicated apps are a nice upgrade---not a requirement.}
+
+
+\section{Next step}
+Next, we will add \textbf{Local AI}. This is the most hardware-dependent part of the manual:
+it can run on CPU, but a GPU makes it much faster and more pleasant to use. 

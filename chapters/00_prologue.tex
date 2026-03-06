@@ -1,0 +1,64 @@
+% chapters/00_prologue.tex
+\chapter*{Prologue}
+\addcontentsline{toc}{chapter}{Prologue}
+
+\begin{center}
+  \vspace{0.6cm}
+  \includegraphics[width=0.38\textwidth]{serivdor_perplejo}
+  \vspace{0.8cm}
+\end{center}
+
+
+This manual is a practical, step-by-step guide to building your own small digital ecosystem: a private photo library, a music server, local AI tools, and a personal cloud drive---all running on your own machine, under your control, with Docker as the backbone.
+
+The motivation is simple: most of our digital lives live somewhere else. Photos, documents, messages, research notes, calendars, passwords, and even our work routines are increasingly mediated by services we do not operate. This can be convenient, but convenience often comes with hidden costs: lock-in, recurring subscriptions, opaque data practices, and a quiet dependence on decisions made far from our needs and values.
+
+The goal here is not to reject the internet or to chase an unrealistic ideal of ``total independence''. The goal is to show that a meaningful level of \emph{digital sovereignty} is achievable with accessible tools: electricity, internet, a computer, and a bit of patience. You can keep your core data at home (or at your institution), expose only what you choose, and still enjoy modern usability.
+
+This manual is written for people who want to:
+\begin{itemize}[leftmargin=*]
+  \item understand what they run and where their data lives,
+  \item reduce dependence on external platforms without sacrificing daily convenience,
+  \item create a modular setup that can evolve over time,
+  \item document the process so it can be reproduced by colleagues, friends, or students.
+\end{itemize}
+
+\section*{A note on scope}
+\addcontentsline{toc}{section}{A note on scope}
+
+We focus on a pragmatic stack:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Docker + Linux} as the foundation,
+  \item \textbf{PhotoPrism} for photos,
+  \item \textbf{Navidrome} for music,
+  \item \textbf{Local AI} (Ollama + a web UI) for private, on-device workflows,
+  \item \textbf{A private drive} (e.g., Seafile) for syncing and organizing files.
+\end{itemize}
+
+We will also briefly discuss operational concerns: storage layout, backups, updates, and basic security choices. Whenever something depends on a specific environment (home server vs. university server, VPN vs. public exposure), we explicitly say so.
+
+\section*{How to use this manual}
+\addcontentsline{toc}{section}{How to use this manual}
+
+Each chapter follows a predictable pattern:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Goal}: what you will have at the end,
+  \item \textbf{Prerequisites}: what you need beforehand,
+  \item \textbf{Steps}: the actions to perform,
+  \item \textbf{Verification}: how to confirm it works,
+  \item \textbf{Troubleshooting}: the common failure modes and fixes.
+\end{itemize}
+
+If you already have a Docker host running, you can skip directly to the service chapters (PhotoPrism, Navidrome, Local AI, and the Private Drive). If you only want one service, you can treat chapters as independent modules.
+
+\section*{Philosophy: small, modular, reproducible}
+\addcontentsline{toc}{section}{Philosophy: small, modular, reproducible}
+
+This manual aims for:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Small steps}: avoid ``big bang'' setups. Make one thing work, then add the next.
+  \item \textbf{Modularity}: each service lives in its own container(s), with clear volumes and ports.
+  \item \textbf{Reproducibility}: all configuration should be portable via compose files and a documented folder structure.
+\end{itemize}
+
+Done well, the result feels less like ``running servers'' and more like owning your own digital workspace.

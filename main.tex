@@ -1,0 +1,147 @@
+% main.tex
+\documentclass[11pt,a4paper,oneside]{book}
+
+% ---------- Packages ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{fancyhdr}
+
+\geometry{margin=2.5cm}
+\graphicspath{{Imagenes/}}
+
+% Friendly callout box
+\newcommand{\encourage}[1]{%
+  \vspace{0.5em}
+  \noindent\colorbox{gray!10}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{\textit{#1}}}
+  \vspace{0.5em}
+}
+
+% ---------- Code blocks ----------
+\lstset{
+  basicstyle=\ttfamily\small,
+  columns=fullflexible,
+  frame=single,
+  breaklines=true,
+  postbreak=\mbox{\textcolor{gray}{$\hookrightarrow$}\space},
+}
+\hypersetup{hypertexnames=false}
+% ---------- Header / Footer ----------
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Digital Sovereignty Manual}
+\rhead{\nouppercase{\leftmark}}
+\cfoot{\thepage}
+\setlength{\headheight}{14pt}
+
+% Make chapter-opening pages use the same header/footer (book uses 'plain' there)
+\fancypagestyle{plain}{
+  \fancyhf{}
+  \lhead{Digital Sovereignty Manual}
+  \rhead{\nouppercase{\leftmark}}
+  \cfoot{\thepage}
+  \setlength{\headheight}{14pt}
+}
+
+% Improve chapter marks (avoid "CHAPTER X" clutter in headers)
+\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
+
+% ---------- Metadata ----------
+\title{Digital Sovereignty in Practice\\ \large Self-hosted services with Docker: Photos, Music, Local AI, and Private Drive}
+\author{Mattia Coccolo}
+\date{\today}
+
+% ---------- Custom title page (editorial: floating title + vertically centered image) ----------
+\makeatletter
+\renewcommand{\maketitle}{%
+  \begin{titlepage}
+    \thispagestyle{empty}
+    \centering
+
+    % --- Top: floating title block ---
+    \vspace*{1.3cm}
+    {\Huge\bfseries Digital Sovereignty\par}
+    \vspace{0.15cm}
+    {\Huge\bfseries in Practice\par}
+    \vspace{0.45cm}
+    {\large Self-hosted services with Docker: Photos, Music, Local AI, and Private Drive\par}
+
+    % --- Middle: vertically centered image ---
+    \vfill
+    \includegraphics[width=0.62\textwidth]{Imagenes/serivdor_rey}
+    \vfill
+
+    % --- Bottom: author + date (quiet) ---
+    {\large Mattia Coccolo\par}
+    \vspace{0.15cm}
+    {\small \today\par}
+
+    \vspace*{1.0cm}
+  \end{titlepage}
+}
+\makeatother
+
+% --- Watermark / corner logo on odd pages only (GLOBAL, compatible) ---
+\usepackage{eso-pic}
+\usepackage{transparent}
+
+\newcommand{\OddCornerMark}{%
+  \AddToShipoutPictureFG{%
+    \ifodd\value{page}
+      \AtPageUpperLeft{%
+        \raisebox{-30.2cm}{% baja desde arriba
+          \hspace*{18.8cm}% desplaza hacia la derecha (ajusta)
+          \transparent{1}%
+          \includegraphics[width=2.2cm]{serivdor_rey_agua}%
+        }%
+      }%
+    \fi
+  }%
+}
+\begin{document}
+
+\frontmatter
+\maketitle
+
+\cleardoublepage
+\input{frontmatter/00_license}
+
+\tableofcontents
+
+\input{chapters/00_prologue}
+
+\mainmatter
+\OddCornerMark
+\input{chapters/01_intro_digital_sovereignty}
+
+% Choose one of the two server paths:
+\input{chapters/02A_server_linux_docker}
+\input{chapters/02B_server_windows_wsl2_docker}
+\input{chapters/04_theory_compose_yaml}
+% Service chapters (uncomment as you write them)
+ \input{chapters/05_photoprism}
+\input{chapters/06_navidrome}
+ \input{chapters/07_local_ai}
+\input{chapters/08_nextcloud_drive}
+\input{chapters/09_seafile_drive}
+\input{chapters/10_maintenance_updates_backups}
+% --- Appendix separator page ---
+\input{appendices/00_appendix_separator}
+\appendix
+\input{appendices/A_glossary}
+\input{appendices/B_compose_files}
+\input{appendices/C_vpn_remote_access}
+\input{appendices/appendix_terminator}
+% \input{appendices/B_troubleshooting}
+% \input{appendices/C_backups_security}
+
+\end{document} 

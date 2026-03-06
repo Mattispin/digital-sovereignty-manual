@@ -1,0 +1,146 @@
+% chapters/01_intro_digital_sovereignty.tex
+\chapter{Digital Sovereignty: what it is, and why it matters}
+
+
+\begin{center}
+  \vspace{0.6cm}
+  \includegraphics[width=0.38\textwidth]{serivdor_rey}
+  \vspace{0.8cm}
+\end{center}
+
+
+\section{A working definition}
+Digital sovereignty is the ability to \emph{choose} how your digital life works:
+\begin{itemize}[leftmargin=*]
+  \item where your data is stored,
+  \item who can access it (and under what conditions),
+  \item how services evolve over time,
+  \item what happens if a provider changes rules, prices, or policies.
+\end{itemize}
+
+It is not a binary state. It is a spectrum. The question is not ``sovereign or not'', but \emph{how much control you want} and \emph{where it is worth the effort}.
+
+\section{Why it matters (even if you are not ``technical'')}
+There are four recurring reasons people move toward more sovereignty:
+
+\subsection{Control and resilience}
+Platforms change. Features disappear. Prices rise. Accounts get locked. Terms of service shift. A self-hosted core makes your workflow more resilient: if one component fails, you still own your data and can migrate.
+
+\subsection{Privacy and confidentiality}
+For researchers, professionals, and anyone handling personal archives, privacy is not a luxury. Local-first tools reduce the need to upload sensitive content to third parties by default.
+
+\subsection{Cost transparency}
+Many cloud services start free and become expensive at scale (storage, team accounts, add-ons). With self-hosting, costs are mostly upfront (hardware, disks) and predictable (electricity, backups). That trade-off often becomes favorable once you have non-trivial archives (photos, videos, datasets).
+
+\subsection{Freedom from lock-in}
+When your data and workflows depend on proprietary formats or closed ecosystems, switching becomes painful. Using standard tools and keeping raw files under your control makes migration a choice, not a crisis.
+
+\section{Threat model: what are we protecting against?}
+Before installing anything, define what you care about. A minimal threat model answers:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Loss}: disk failure, accidental deletion, ransomware.
+  \item \textbf{Exposure}: services reachable from the public internet without safeguards.
+  \item \textbf{Lock-in}: dependence on one provider or one app.
+  \item \textbf{Downtime}: updates breaking the stack with no rollback plan.
+\end{itemize}
+
+This manual assumes a reasonable baseline: protect your core data, keep the system maintainable, and avoid unnecessary public exposure. If you want internet-facing services, we will highlight the extra steps (reverse proxy, TLS, hardening, monitoring) rather than treating them as default.
+
+\section{Hardware requirements (practical guidance)}
+You do not need a data center. The minimum viable setup is surprisingly modest.
+
+\subsection{Baseline (photos + music + private drive)}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{CPU}: 4 cores (8 threads recommended)
+  \item \textbf{RAM}: 8--16 GB (16 GB is comfortable)
+  \item \textbf{Storage}: SSD for system + Docker volumes; HDD/SSD for media/archive
+  \item \textbf{Network}: stable LAN; optional VPN for remote access
+\end{itemize}
+
+\subsection{When you want local AI}
+Local AI is the only part that may require specialized hardware.
+\begin{itemize}[leftmargin=*]
+  \item \textbf{GPU (optional)}: strongly recommended for larger models and good latency.
+  \item \textbf{VRAM}: the practical limiter. More VRAM allows larger models and higher context windows.
+  \item \textbf{RAM}: 16 GB minimum; 32 GB recommended if you also run other services heavily.
+\end{itemize}
+Without a GPU you can still run small models on CPU, but responses will be slower and the experience changes.
+
+\subsection{A real-world example (from the author’s Docker host)}
+Table~\ref{tab:docker_resources_example} shows a snapshot of the kind of resource usage you might see while running a small stack.
+
+\begin{table}[h]
+\centering
+\caption{Example: container resource usage snapshot on a 24-CPU host.}
+\label{tab:docker_resources_example}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Metric & Example value \\ \midrule
+Container CPU usage & 0.79\% / 2400\% (24 CPUs available) \\
+Container memory usage & 4.53\,GB / 15.22\,GB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The ``2400\%'' upper bound means Docker reports CPU as a sum across cores: 100\% roughly corresponds to one fully utilized core, and 2400\% corresponds to 24 cores.
+
+\section{Choose your installation path (read this once)}
+This manual offers two ways to build the server foundation:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Path A (recommended): Linux server + Docker.} This is the simplest and most reliable option for an always-on machine.
+  \item \textbf{Path B: Windows + WSL2 + Docker.} This is a beginner-friendly path if you already use Windows and want to learn step by step, but it adds one extra layer (Windows + Linux).
+\end{itemize}
+
+\textbf{Pick one path and follow it.} After the foundation is ready, the rest of the manual (PhotoPrism, Navidrome, Local AI, Private Drive) is the same in both cases.
+
+
+\section{What you will build}
+By the end of this manual you will have:
+\begin{itemize}[leftmargin=*]
+  \item a Linux host with Docker and a clean folder layout for persistent data,
+  \item PhotoPrism indexing and serving your photo library,
+  \item Navidrome serving your music library,
+  \item a local AI service and a simple web interface to use it privately,
+  \item a private drive service for file sync and collaboration,
+  \item a basic operational routine: updates, backups, and sanity checks.
+\end{itemize}
+
+\section{What this manual intentionally avoids}
+To keep the path accessible, we do \emph{not} start with advanced infrastructure topics such as:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Kubernetes clusters} (container orchestration across many machines),
+  \item \textbf{mandatory public exposure} (domain name, reverse proxy, TLS/HTTPS),
+  \item \textbf{heavy monitoring stacks} (full-time metrics, dashboards, and alerting).
+\end{itemize}
+
+If some of the words above look like mysterious tech jargon, do not worry.
+This section exists so that, when you encounter these terms in more complex books or manuals, you can understand them without feeling lost.
+We do not use them in this manual---but you can tell your friends you know what they are and casually show off ;-) ...and sound surprisingly competent at dinner
+
+\subsection*{Kubernetes (we do not use it here)}
+Kubernetes is a system for running containers at large scale: many machines, many services, automatic scheduling, and automatic recovery.
+It is powerful and widely used in companies, but it adds a lot of complexity.
+In this manual, we use Docker Compose because it is simpler, easier to learn, and more than enough for a personal or small-group server.
+
+\subsection*{Public exposure, domains, reverse proxies, and TLS (optional later)}
+Making a service accessible from the public internet safely usually involves several extra pieces:
+\begin{itemize}[leftmargin=*]
+  \item a \textbf{domain name} (a human-friendly address),
+  \item a \textbf{reverse proxy} (a gateway that routes traffic to the correct service),
+  \item \textbf{TLS/HTTPS} (encryption so passwords and data are not sent in plain text).
+\end{itemize}
+
+These are valuable, but they also create more ways to misconfigure a system.
+In this manual, the default is \textbf{local network access or VPN access}, which is simpler and safer for beginners.
+Later, if you want your services publicly reachable, you can add these components deliberately.
+
+\subsection*{Heavy monitoring stacks (nice, but not the first step)}
+Monitoring stacks are tools that collect metrics, logs, and alerts (CPU usage, memory, disk space, failures, response times).
+They are great when you operate many systems or need strict uptime.
+For a personal server, you can start with simple checks and basic logs.
+Once your core system is stable and you know what ``normal'' looks like, adding monitoring becomes much easier and more meaningful.
+
+\subsection*{The principle}
+You can add advanced layers later.
+First, make the core system reliable: \textbf{clear storage, reproducible configuration, and backups}. 

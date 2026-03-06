@@ -1,0 +1,463 @@
+% chapters/04_theory_compose_yaml.tex
+\chapter{How to read this manual: YAML and Docker Compose (just enough theory)}
+\label{ch:theory_compose_yaml}
+
+
+\begin{center}
+  \vspace{0.6cm}
+  \includegraphics[width=0.38\textwidth]{serivdor_estudia}
+  \vspace{0.8cm}
+\end{center}
+
+
+\section{Goal (what you will achieve)}
+This chapter gives you the minimum theory needed to follow the rest of the manual confidently.
+
+By the end, you will:
+\begin{itemize}[leftmargin=*]
+  \item understand what a \texttt{docker-compose.yml} file is and why we use it,
+  \item recognize the most common YAML patterns (indentation, lists, key/value),
+  \item know what \texttt{services}, \texttt{ports}, \texttt{volumes}, and \texttt{environment} mean,
+  \item understand what \texttt{.env} is and why we keep passwords there,
+  \item know what MariaDB is and when you need a database,
+  \item avoid the most common beginner mistakes (especially indentation and permissions).
+\end{itemize}
+
+\encourage{If YAML looks like mysterious hieroglyphs: that is normal. After this chapter, you will be able to read Compose files like a recipe. You do not need to become a chef.}
+
+\section{What is YAML?}
+YAML is a human-friendly text format used to describe structured information.
+In this manual, we use YAML because Docker Compose uses it.
+
+\subsection*{Three rules that explain 90\% of YAML}
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Indentation matters.} YAML uses spaces to show hierarchy.
+  \item \textbf{Key: value} pairs define settings.
+  \item \textbf{Lists use dashes} (\texttt{- item}).
+\end{enumerate}
+
+\subsection*{Example: key/value and indentation}
+\begin{lstlisting}
+person:
+  name: Mattia
+  role: Admin
+\end{lstlisting}
+Here, \texttt{name} and \texttt{role} belong ``inside'' \texttt{person} because they are indented.
+
+\subsection*{Example: a list}
+\begin{lstlisting}
+shopping_list:
+  - pasta
+  - tomatoes
+  - coffee
+\end{lstlisting}
+
+\subsection*{What does \texttt{\#} mean?}
+A \texttt{\#} starts a \textbf{comment}. Comments are ignored by the computer.
+They are there for humans.
+
+\begin{lstlisting}
+# This is a comment. It does nothing, but it helps you understand the file.
+\end{lstlisting}
+
+\encourage{YAML is picky, but not evil. If something breaks, the most common cause is indentation (missing spaces), not your life choices.}
+
+\section{What is Docker Compose (in plain language)?}
+Docker Compose is a tool that reads a file called \texttt{docker-compose.yml} and starts a set of containers for you.
+
+Think of it like a playlist:
+\begin{itemize}[leftmargin=*]
+  \item the file lists which services you want (PhotoPrism, Navidrome, etc.),
+  \item Compose starts them in a consistent way,
+  \item you can stop them, restart them, and upgrade them reliably.
+\end{itemize}
+
+\subsection*{Why we use Compose in this manual}
+Without Compose, you would type long Docker commands every time.
+With Compose, the setup becomes:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{reproducible} (you can move it to another machine),
+  \item \textbf{documented} (the file explains what you run),
+  \item \textbf{upgrade-friendly} (pull new images and restart).
+\end{itemize}
+
+\section{A Compose file is a ``service recipe''}
+Most of our Compose files follow the same pattern:
+
+\begin{lstlisting}
+services:
+  some-service:
+    image: some/image:tag
+    ports:
+      - "1234:1234"
+    environment:
+      KEY: "value"
+    volumes:
+      - /host/path:/container/path
+\end{lstlisting}
+
+Let's translate the important words.
+
+\section{Core blocks you will see everywhere}
+\subsection{\texttt{services}}
+A \texttt{service} is one container (or sometimes a group of containers with one role).
+In our manual:
+\begin{itemize}[leftmargin=*]
+  \item PhotoPrism is a service,
+  \item MariaDB (database) is another service,
+  \item Navidrome is a service,
+  \item Ollama and Open WebUI are services.
+\end{itemize}
+
+\subsection{\texttt{image}}
+\texttt{image} tells Docker what software to run.
+\begin{itemize}[leftmargin=*]
+  \item An \textbf{image} is like a packaged application template.
+  \item A \textbf{container} is a running instance of that image.
+\end{itemize}
+
+Example:
+\begin{lstlisting}
+image: photoprism/photoprism:latest
+\end{lstlisting}
+
+\subsection{\texttt{ports}}
+Ports let your browser or apps reach a service.
+
+Example:
+\begin{lstlisting}
+ports:
+  - "2342:2342"
+\end{lstlisting}
+
+\textbf{How to read it:}
+\begin{itemize}[leftmargin=*]
+  \item left side = host (your machine) port,
+  \item right side = container port (inside the service).
+\end{itemize}
+
+So \texttt{"2342:2342"} means:
+\begin{itemize}[leftmargin=*]
+  \item open port 2342 on your machine,
+  \item forward it to port 2342 inside the container.
+\end{itemize}
+
+\subsection{\texttt{volumes}}
+Volumes are the most important concept for data safety.
+
+Example:
+\begin{lstlisting}
+volumes:
+  - /srv/photos/originals:/photoprism/originals
+\end{lstlisting}
+
+\textbf{How to read it:}
+\begin{itemize}[leftmargin=*]
+  \item left side = real folder on your disk (persistent),
+  \item right side = folder inside the container (where the app expects files).
+\end{itemize}
+
+\textbf{Why it matters:}
+\begin{itemize}[leftmargin=*]
+  \item You can delete/recreate containers without losing data.
+  \item Backups become simple: you back up \texttt{/srv/...}.
+\end{itemize}
+
+\encourage{Repeat this mantra: containers are disposable; data is not. If you get volumes right, you win.}
+
+\subsection{\texttt{environment}}
+Environment variables are configuration settings given to the application.
+
+Example:
+\begin{lstlisting}
+environment:
+  PHOTOPRISM_ADMIN_PASSWORD: "a-strong-password"
+\end{lstlisting}
+
+\textbf{Why we use them:}
+\begin{itemize}[leftmargin=*]
+  \item They keep configuration close to the Compose file.
+  \item They are the standard way many containers are configured.
+\end{itemize}
+
+\section{What is a \texttt{.env} file (and why we use it)?}
+A \texttt{.env} file sits next to \texttt{docker-compose.yml} and stores variables.
+
+Example:
+\begin{lstlisting}
+PHOTOPRISM_ADMIN_PASSWORD=CHANGE_THIS
+MARIADB_PASSWORD=CHANGE_THIS_TOO
+\end{lstlisting}
+
+Then, in YAML, we reference them like:
+\begin{lstlisting}
+PHOTOPRISM_ADMIN_PASSWORD: ${PHOTOPRISM_ADMIN_PASSWORD}
+\end{lstlisting}
+
+\textbf{Why we do it:}
+\begin{itemize}[leftmargin=*]
+  \item keeps passwords out of the YAML (cleaner),
+  \item makes it easier to share Compose files without leaking secrets,
+  \item centralizes configuration in one place.
+\end{itemize}
+
+\section{What is MariaDB, and why does PhotoPrism need it?}
+MariaDB is a database server (similar to MySQL).
+A database is a structured storage system for:
+\begin{itemize}[leftmargin=*]
+  \item indexes,
+  \item metadata,
+  \item search tables,
+  \item application state.
+\end{itemize}
+
+Some apps can store everything in simple files; others work better with a database.
+PhotoPrism can use SQLite or MySQL/MariaDB, but for larger libraries and better performance, MariaDB is commonly used.
+
+\section{Useful words you will see later (and what they mean)}
+This manual tries to stay beginner-friendly, but some technical words are unavoidable.
+Here are the ones that appear in later chapters, explained in plain language.
+
+\subsection{MySQL vs MariaDB}
+\textbf{MySQL} and \textbf{MariaDB} are very similar database servers.
+MariaDB started as a community-developed alternative to MySQL and is widely used.
+In practice, many applications treat them as interchangeable for common use.
+
+\textbf{What matters for you:}
+\begin{itemize}[leftmargin=*]
+  \item The ``database service'' is the container that stores structured data (metadata, indexes, users, settings).
+  \item When a config says \texttt{DB\_HOST} or \texttt{MYSQL\_HOST}, it means: \emph{the name of the database service on the Docker network}.
+\end{itemize}
+
+Example:
+\begin{lstlisting}
+MYSQL_HOST: db
+\end{lstlisting}
+This means: ``connect to the container named \texttt{db} (service name), not to an external server.''
+
+\subsection{Redis and Memcached (fast helpers)}
+\textbf{Redis} and \textbf{Memcached} are small services used as memory caches.
+They help performance and reduce database load.
+
+In this manual:
+\begin{itemize}[leftmargin=*]
+  \item Nextcloud uses Redis for locking/caching (helps stability, especially with many files).
+  \item Seafile often uses Memcached for performance.
+\end{itemize}
+
+You do not ``use'' them directly as a user; they are internal helpers.
+
+\subsection{Cron and ``background jobs''}
+Some apps need periodic tasks: cleanup, indexing, sending notifications, updating shares, etc.
+This is often called \textbf{background jobs}.
+
+In Nextcloud, running background jobs properly matters a lot.
+That is why we include a dedicated \texttt{cron} container.
+
+\subsection{HTTP vs HTTPS (TLS): the safety layer}
+\textbf{HTTP} is plain web traffic. \textbf{HTTPS} is encrypted web traffic (HTTP + TLS).
+
+\textbf{Practical rule:}
+\begin{itemize}[leftmargin=*]
+  \item On your local network (LAN) and especially when using VPN, HTTP is often acceptable for beginners.
+  \item If you expose services to the public internet, you must use HTTPS (TLS) and a proper reverse proxy.
+\end{itemize}
+
+\encourage{If you are unsure: do not expose your services publicly yet. Use VPN first. It is safer and simpler.}
+
+\subsection{Domains, hostnames, and ``trusted domains''}
+A \textbf{hostname} is a human-friendly name for a machine (e.g., \texttt{server}, \texttt{nextcloud}).
+A \textbf{domain} is a public name you can buy (e.g., \texttt{yourname.com}).
+
+\textbf{Trusted domains} are a security feature in apps like Nextcloud:
+they refuse requests from unknown hostnames to prevent certain attacks.
+That is why you must list the addresses you use (e.g., \texttt{localhost}, \texttt{SERVER\_IP}, or your domain).
+
+\subsection{UID/GID (why permissions sometimes hurt)}
+Linux permissions are based on user IDs:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{UID}: user ID
+  \item \textbf{GID}: group ID
+\end{itemize}
+
+Some containers run as a specific internal user. If file permissions do not match, you may see ``permission denied'' errors.
+That is why some services support setting \texttt{UID/GID} explicitly.
+
+\subsection{JWT (a shared secret for trusted communication)}
+\textbf{JWT} stands for JSON Web Token. In our context, you do not need to learn the standard.
+You only need the practical meaning:
+
+\begin{itemize}[leftmargin=*]
+  \item Some integrations (like OnlyOffice) require a \textbf{shared secret}.
+  \item Both services must use the \emph{same secret} to trust each other.
+  \item This is often configured as \texttt{JWT\_SECRET}.
+\end{itemize}
+
+\textbf{Practical rule:} choose a long random string and keep it consistent across the services that need it.
+
+\subsection{Reverse proxy (optional, advanced)}
+A \textbf{reverse proxy} is a gateway in front of your services.
+It can:
+\begin{itemize}[leftmargin=*]
+  \item route traffic to the correct container,
+  \item provide HTTPS/TLS,
+  \item centralize security headers and access rules.
+\end{itemize}
+
+We do not require a reverse proxy in this manual, because it is optional and adds complexity.
+If you later want public access with a domain, a reverse proxy becomes important.
+
+\section{Finding your server address (IP): the one thing you need for mobile access}
+Many chapters say: open \texttt{http://SERVER\_IP:PORT}.
+This section explains what \texttt{SERVER\_IP} means and how to find it.
+
+\subsection*{What is \texttt{SERVER\_IP}?}
+It is the local network address of the machine running your services (PhotoPrism, Navidrome, etc.).
+If your phone is on the same Wi-Fi, it can reach that address directly.
+
+\encourage{You do not need to understand networking deeply. You only need to find the IP once, then reuse it everywhere.}
+
+\subsection{Linux (Path A)}
+In a Linux terminal, run one of these:
+
+\begin{lstlisting}
+hostname -I
+\end{lstlisting}
+
+or:
+
+\begin{lstlisting}
+ip a
+\end{lstlisting}
+
+Look for an address like \texttt{192.168.x.x} or \texttt{10.x.x.x}. That is usually your LAN IP.
+
+\subsection{Windows (Path B)}
+Open PowerShell and run:
+
+\begin{lstlisting}
+ipconfig
+\end{lstlisting}
+
+Look for \texttt{IPv4 Address} under your active network adapter (Wi-Fi or Ethernet).
+
+\subsection{Quick sanity check}
+From another device on the same Wi-Fi (phone/tablet/laptop), open a browser and try:
+
+\begin{lstlisting}
+http://SERVER_IP:2342
+\end{lstlisting}
+
+If PhotoPrism loads, you found the right IP.
+
+\subsection*{Common confusion: multiple IP addresses}
+Sometimes you will see more than one IP address (Ethernet + Wi-Fi + VPN).
+Use the one that matches the network you are currently using (for example, the Wi-Fi subnet).
+
+
+\section{VPN: the safe way to access your server from outside}
+Sooner or later you will want to access your services when you are not at home (or not on the same Wi-Fi).
+There are two broad approaches:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Expose services publicly} (open ports on the router, set up a domain, reverse proxy, TLS).
+  \item \textbf{Use a VPN} (recommended for beginners).
+\end{itemize}
+
+\subsection{What is a VPN (plain language)?}
+A VPN (Virtual Private Network) creates an encrypted ``tunnel'' between your device (phone/laptop) and your home network (or server).
+When connected, your device behaves \emph{as if it were inside your home network}.
+That means:
+\begin{itemize}[leftmargin=*]
+  \item you can use the same addresses as at home, e.g., \texttt{http://SERVER\_IP:2342},
+  \item you do not need to expose every service to the public internet.
+\end{itemize}
+
+\subsection{Why this manual prefers VPN first}
+Public exposure can be done safely, but it has more moving parts and more ways to misconfigure things.
+A VPN is often:
+\begin{itemize}[leftmargin=*]
+  \item simpler,
+  \item safer by default,
+  \item easier to reason about (``only my devices can enter'').
+\end{itemize}
+
+
+\encourage{If your goal is ``access my stuff from anywhere'', a VPN is usually the shortest path that does not turn into a security project.}
+
+\subsection{How VPN fits into this manual}
+Our default workflow is:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Local first:} make everything work on your local network (LAN/Wi-Fi).
+  \item \textbf{Then remote:} add a VPN so you can access the same services while travelling.
+\end{itemize}
+
+\subsection{Do we teach VPN setup here?}
+We give the concept here to avoid confusion, but a full VPN setup depends on your environment
+(router, ISP restrictions, CGNAT, existing university VPN, etc.).
+
+For that reason, the step-by-step VPN setup is placed in a separate optional appendix:
+Appendix~\ref{app:vpn}.
+
+\section{Common beginner mistakes (and how to avoid them)}
+\subsection{Mistake 1: indentation errors in YAML}
+If Compose fails with a YAML parsing error:
+\begin{itemize}[leftmargin=*]
+  \item check that indentation uses spaces (not tabs),
+  \item check that lists use \texttt{- } and align correctly,
+  \item when in doubt, compare to a known working example from this manual.
+\end{itemize}
+
+\subsection{Mistake 2: editing the wrong file in the wrong folder}
+When we say:
+\begin{lstlisting}
+cd /srv/docker/compose/photoprism
+\end{lstlisting}
+we mean: \textbf{go into that folder first}, then run Compose there.
+Otherwise, Docker might run a different project than you think.
+
+\subsection{Mistake 3: storing data inside the container}
+If your \texttt{volumes:} are missing or wrong, your data may disappear when the container is recreated.
+Always check that important folders map to \texttt{/srv/...} on the host.
+
+\subsection{Mistake 4: confusing host ports and container ports}
+If you map \texttt{"1234:2342"}, you must open \texttt{http://localhost:1234} in your browser.
+The left side is the port you use from outside.
+
+\subsection{Mistake 5: permission issues on mounted folders}
+If an app cannot write to a volume:
+\begin{itemize}[leftmargin=*]
+  \item ensure the folder exists,
+  \item ensure your user owns it (or the container is configured with matching UID/GID),
+  \item on Linux, a common fix is:
+\end{itemize}
+
+\begin{lstlisting}
+sudo chown -R $USER:$USER /srv
+\end{lstlisting}
+
+\section{The three Compose commands you will use all the time}
+\subsection*{Start services}
+\begin{lstlisting}
+docker compose up -d
+\end{lstlisting}
+
+\subsection*{Stop services}
+\begin{lstlisting}
+docker compose down
+\end{lstlisting}
+
+\subsection*{See what is running}
+\begin{lstlisting}
+docker ps
+\end{lstlisting}
+
+\subsection*{Read logs (your best friend when things fail)}
+\begin{lstlisting}
+docker compose logs -f --tail=100
+\end{lstlisting}
+
+\encourage{When something fails: do not guess. Check logs. Logs look intimidating, but they usually contain the exact clue you need.}
+
+\section{Next step}
+Now you can read the Compose files in the service chapters like a recipe.
+In Appendix B, you will also find all Compose files collected in one place for easy copy/paste. 

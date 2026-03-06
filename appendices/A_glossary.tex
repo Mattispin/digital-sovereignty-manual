@@ -1,0 +1,40 @@
+% appendices/A_glossary.tex
+\chapter{Beginner Glossary}
+\label{app:glossary}
+
+
+
+This glossary explains common terms used throughout the manual.
+
+\section*{Core concepts}
+\addcontentsline{toc}{section}{Core concepts}
+
+\begin{description}[leftmargin=!,labelwidth=4cm]
+  \item[Terminal] A text-based interface where you type commands for the operating system.
+  \item[Command] A short instruction you type in the terminal (e.g., \texttt{sudo apt update}).
+  \item[sudo] ``Run as administrator'' on Linux. Required for system-level changes.
+  \item[Package manager (APT)] A tool that installs and updates software on Debian/Ubuntu (\texttt{apt}).
+  \item[Repository] A source of software packages that \texttt{apt} can download from.
+  \item[GPG key] A cryptographic key used to verify that packages come from the real publisher and were not modified.
+\end{description}
+
+\section*{Docker terms}
+\addcontentsline{toc}{section}{Docker terms}
+
+\begin{description}[leftmargin=!,labelwidth=4cm]
+  \item[Docker] A system to run applications in containers.
+  \item[Container] A lightweight isolated environment that runs an application with its dependencies.
+  \item[Image] A packaged template used to create containers (like an app ``installer'', but for containers).
+  \item[Volume] A folder where containers store persistent data on the host disk.
+  \item[Docker Compose] A tool to define and run multi-container setups using a YAML file.
+  \item[Port] A network entry point (e.g., \texttt{8080}) used to reach a service from a browser or an app.
+\end{description}
+
+\section*{Remote access and security}
+\addcontentsline{toc}{section}{Remote access and security}
+
+\begin{description}[leftmargin=!,labelwidth=4cm]
+  \item[SSH] Secure remote login to a Linux machine (terminal access over the network).
+  \item[Firewall] A system that controls which network traffic is allowed in/out.
+  \item[VPN] A private network tunnel that lets you access services securely as if you were on the local network.
+\end{description} 

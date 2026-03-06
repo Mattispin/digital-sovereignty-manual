@@ -1,0 +1,209 @@
+% appendices/C_vpn_remote_access.tex
+\chapter{Optional: Remote access with VPN (recommended)}
+\label{app:vpn}
+
+\section{Goal}
+This appendix explains how to access your self-hosted services (PhotoPrism, Navidrome, etc.)
+from outside your home network \emph{without} exposing them publicly to the internet.
+
+By the end, you will:
+\begin{itemize}[leftmargin=*]
+  \item understand why VPN is the safest beginner-friendly approach,
+  \item choose a VPN method that fits your environment,
+  \item verify remote access using the same local URLs (e.g., \texttt{http://SERVER\_IP:2342}).
+\end{itemize}
+
+\encourage{Remote access is where many projects go off the rails. A VPN keeps it simple: instead of making your services public, you make \emph{your device private}.}
+
+\section{The key idea (one sentence)}
+A VPN makes your phone/laptop behave as if it were on your home Wi-Fi, even when you are away.
+
+That means: if PhotoPrism works at home with
+\begin{lstlisting}
+http://SERVER_IP:2342
+\end{lstlisting}
+it should work the same way over VPN.
+
+\section{Before you start: avoid the ``open ports'' trap}
+A common beginner instinct is: ``I will just open a port on my router.''
+This can work, but it often leads to:
+\begin{itemize}[leftmargin=*]
+  \item security mistakes (public exposure without TLS),
+  \item router/ISP limitations (CGNAT),
+  \item complicated reverse-proxy setups.
+\end{itemize}
+
+VPN is usually the safer, shorter path.
+
+\section{Choose your VPN approach}
+There is no single perfect solution for everyone. Pick the one that matches your situation.
+
+\subsection{Option 1: Use an existing VPN (simplest if you already have one)}
+Some people already have a VPN provided by their workplace or university.
+
+\textbf{How it works:}
+\begin{itemize}[leftmargin=*]
+  \item Connect your phone/laptop to that VPN.
+  \item If your server is reachable through the VPN network, you can access services using the server IP.
+\end{itemize}
+
+\textbf{When this is enough:}
+\begin{itemize}[leftmargin=*]
+  \item your server is inside that VPN network (or reachable through it),
+  \item you only need access for yourself (not for many external users).
+\end{itemize}
+
+\encourage{If you already have a VPN that reaches your server: congrats, you may already be done.}
+
+
+\subsection{Option 2: Tailscale (step-by-step, least friction)}
+Tailscale is a mesh VPN built on WireGuard. Many people like it because it works even when:
+\begin{itemize}[leftmargin=*]
+  \item you cannot easily configure your router,
+  \item your ISP uses CGNAT,
+  \item you want device-to-device access with minimal networking work.
+\end{itemize}
+
+\encourage{This is the ``I just want it to work'' option. Follow the steps in order. If something fails, it is almost always because one device is not logged in, or you are not actually connected.}
+
+\subsubsection*{Step 1 --- Create a Tailscale account}
+On any computer/phone browser:
+\begin{itemize}[leftmargin=*]
+  \item Go to the Tailscale website and create an account (for example using Google, Microsoft, GitHub, etc.).
+\end{itemize}
+You will manage your devices from the Tailscale admin console.
+
+\subsubsection*{Step 2 --- Install Tailscale on the server}
+Install it on the machine that runs your services (the same machine that runs Docker).
+
+\paragraph{Linux (Path A).}
+Install using the official Tailscale script (simple and common):
+\begin{lstlisting}
+curl -fsSL https://tailscale.com/install.sh | sh
+\end{lstlisting}
+
+Then bring the server online:
+\begin{lstlisting}
+sudo tailscale up
+\end{lstlisting}
+
+\textbf{What happens now:}
+\begin{itemize}[leftmargin=*]
+  \item A browser window (or a URL in the terminal) will ask you to log in.
+  \item After login, the server becomes a device in your Tailscale network.
+\end{itemize}
+
+\paragraph{Windows (Path B).}
+Install the Tailscale application on Windows (standard installer).
+Then sign in with the same account.
+(You can run Tailscale on Windows even if your Docker workflow uses WSL2.)
+
+\subsubsection*{Step 3 --- Install Tailscale on your phone/tablet/laptop}
+Install Tailscale on the device you want to use remotely:
+\begin{itemize}[leftmargin=*]
+  \item phone/tablet: install the Tailscale app from your app store,
+  \item laptop: install the Tailscale client for your OS.
+\end{itemize}
+Log in with the same Tailscale account.
+
+\subsubsection*{Step 4 --- Find your server's Tailscale IP}
+Each device gets a stable private IP (often in the \texttt{100.x.y.z} range).
+
+On the server, run:
+\begin{lstlisting}
+tailscale ip -4
+\end{lstlisting}
+
+Or check the device in the Tailscale admin console (it shows the IP and device name).
+
+
+\encourage{When using Tailscale, you typically use the Tailscale IP (often \texttt{100.x.y.z}), not your home Wi-Fi IP (often \texttt{192.168.x.x}).}
+
+\subsubsection*{Step 5 --- Access services using the Tailscale IP}
+Once your phone/laptop is connected to Tailscale, open:
+
+\begin{lstlisting}
+http://TAILSCALE_IP:2342   % PhotoPrism
+http://TAILSCALE_IP:4533   % Navidrome
+\end{lstlisting}
+
+\textbf{Important:} This works from outside your home because your device is now inside your private VPN.
+
+\encourage{If you can load PhotoPrism over mobile data while connected to Tailscale: you have achieved remote access without exposing anything publicly. That is a big win.}
+
+\subsubsection*{Verification checklist (Tailscale)}
+You are done when:
+\begin{itemize}[leftmargin=*]
+  \item the server appears as ``connected'' in Tailscale,
+  \item your phone/laptop is connected in the Tailscale app,
+  \item you can access \texttt{http://TAILSCALE\_IP:2342} from outside your home Wi-Fi.
+\end{itemize}
+
+\subsubsection*{Common pitfalls (Tailscale)}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{You are still on Wi-Fi and think it works ``remotely''.}
+  Test properly: disable Wi-Fi (use mobile data), connect Tailscale, then try again.
+  \item \textbf{Wrong IP.} Use the Tailscale IP (often \texttt{100.x.y.z}), not your home LAN IP (e.g., \texttt{192.168.x.x}).
+  \item \textbf{Not actually connected.} Open the Tailscale app and confirm ``Connected''.
+  \item \textbf{Firewall blocks.} Rare, but if needed, allow inbound connections on the server for local ports (2342, 4533) on the Tailscale interface.
+\end{itemize}
+
+\subsection{Option 3 (advanced): WireGuard (classic self-hosted VPN)}
+WireGuard is a modern VPN protocol known for simplicity and performance.
+
+\textbf{High-level architecture:}
+\begin{itemize}[leftmargin=*]
+  \item your server runs a WireGuard VPN endpoint,
+  \item your phone/laptop is a WireGuard client,
+  \item once connected, your device reaches the server via a private VPN subnet.
+\end{itemize}
+
+\textbf{Why it is ``advanced'' here:}
+\begin{itemize}[leftmargin=*]
+  \item you may need router configuration (port forwarding),
+  \item ISP limitations (CGNAT) can complicate inbound connectivity,
+  \item you will manage keys and a config file manually.
+\end{itemize}
+
+\encourage{WireGuard is worth it if you want maximum control and minimal external dependencies. For this manual, Tailscale remains the recommended default because it has the least friction for beginners.}
+
+
+\section{Verification checklist (for any VPN option)}
+You have remote access when:
+\begin{itemize}[leftmargin=*]
+  \item your device shows ``VPN connected'',
+  \item you can reach the server IP (or VPN IP) from your device,
+  \item PhotoPrism/Navidrome load from outside your home network.
+\end{itemize}
+
+A practical test:
+\begin{itemize}[leftmargin=*]
+  \item turn off Wi-Fi on your phone (use mobile data),
+  \item connect the VPN,
+  \item open \texttt{http://SERVER\_IP:2342} (or VPN IP).
+\end{itemize}
+
+\section{Common pitfalls}
+\subsection*{It works at home but not outside}
+Most likely: you are not actually reaching your home network.
+Check that your VPN is connected \emph{and} that it routes traffic to your home subnet.
+
+\subsection*{CGNAT or ISP restrictions}
+Some ISPs prevent inbound connections to your home. This makes classic port-forwarding VPN setups harder.
+In these cases, solutions like Tailscale often work more smoothly.
+
+\subsection*{Firewall blocking}
+If the VPN connects but services do not load, check:
+\begin{itemize}[leftmargin=*]
+  \item server firewall rules,
+  \item Windows firewall (if applicable),
+  \item whether the service is bound to the correct interface (usually OK with Docker port publishing).
+\end{itemize}
+
+\subsection*{Security reminder}
+VPN access still deserves strong passwords and updates.
+A VPN is not a substitute for basic hygiene; it is a safer network boundary.
+
+\section{Where to go next}
+If you want an even more independent setup, the next upgrade is a full \textbf{WireGuard quickstart}
+(self-hosted and fully under your control). For most users, Tailscale is already an excellent solution. 

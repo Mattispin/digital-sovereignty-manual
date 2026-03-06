@@ -1,0 +1,229 @@
+% chapters/10_maintenance_updates_backups.tex
+\chapter{Maintenance: updates, logs, and safety checks}
+\label{ch:maintenance}
+
+\begin{center}
+  \vspace{0.6cm}
+  \includegraphics[width=0.38\textwidth]{servidor_paz}
+  \vspace{0.8cm}
+\end{center}
+
+\section{Goal (what you will achieve)}
+This chapter helps you keep your stack healthy over time.
+You will learn a simple routine for:
+\begin{itemize}[leftmargin=*]
+  \item updating containers safely,
+  \item checking what is running and whether it is healthy,
+  \item reading logs when something breaks,
+  \item doing basic backups (so a disk failure is not a tragedy).
+\end{itemize}
+
+\encourage{This chapter is what turns a cool weekend project into something you can trust for years. You do not need to be perfect---you just need a routine.}
+
+\section{A calm mental model: ``pets'' vs. ``cattle''}
+In old-school server culture, people treated servers like pets: unique, hand-tuned, fragile.
+Modern self-hosting works better when services are more like ``cattle'':
+\begin{itemize}[leftmargin=*]
+  \item containers can be destroyed and recreated,
+  \item configuration lives in Compose files,
+  \item \textbf{data lives in volumes under \texttt{/srv}}.
+\end{itemize}
+
+\encourage{If you get volumes and backups right, updates stop being scary.}
+
+\section{Your basic toolbox (commands you will reuse)}
+From inside a Compose folder (e.g., \texttt{/srv/docker/compose/photoprism}):
+
+\subsection*{See running containers}
+\begin{lstlisting}
+docker ps
+\end{lstlisting}
+
+\subsection*{See logs}
+\begin{lstlisting}
+docker compose logs -f --tail=100
+\end{lstlisting}
+
+\subsection*{Restart a stack}
+\begin{lstlisting}
+docker compose down
+docker compose up -d
+\end{lstlisting}
+
+\subsection*{Update images (safe pattern)}
+\begin{lstlisting}
+docker compose pull
+docker compose up -d
+\end{lstlisting}
+
+\subsection*{Clean unused images (optional, disk cleanup)}
+\begin{lstlisting}
+docker image prune
+\end{lstlisting}
+
+\section{A simple update routine (recommended)}
+Do updates when you have 10--20 minutes and can verify things afterwards.
+
+\subsection{Step 1 --- Update your Linux packages (Path A)}
+On Linux servers, run occasionally:
+
+\begin{lstlisting}
+sudo apt update
+sudo apt upgrade -y
+\end{lstlisting}
+
+\subsection{Step 2 --- Update containers stack-by-stack}
+For each service folder under \texttt{/srv/docker/compose/}:
+
+\begin{lstlisting}
+cd /srv/docker/compose/SERVICE
+docker compose pull
+docker compose up -d
+\end{lstlisting}
+
+\textbf{Why this is safe:}
+\begin{itemize}[leftmargin=*]
+  \item \texttt{pull} downloads new images without changing your running containers,
+  \item \texttt{up -d} recreates containers if needed while keeping volumes intact.
+\end{itemize}
+
+\subsection{Step 3 --- Verify quickly}
+After updating a service, open its web UI:
+\begin{itemize}[leftmargin=*]
+  \item PhotoPrism: \texttt{http://SERVER\_IP:2342}
+  \item Navidrome: \texttt{http://SERVER\_IP:4533}
+  \item Open WebUI: \texttt{http://SERVER\_IP:3000}
+  \item Nextcloud: \texttt{http://SERVER\_IP:8080}
+  \item Seafile: \texttt{http://SERVER\_IP:8000}
+\end{itemize}
+
+\encourage{You are not testing everything. You are doing a quick sanity check: ``does it start and does the main page load?'' That is enough most of the time.}
+
+\section{Reading logs without losing your mind}
+Logs look noisy, but you usually want just a few lines around the error.
+
+\subsection{Per-stack logs (recommended)}
+From the Compose folder:
+\begin{lstlisting}
+docker compose logs --tail=200
+\end{lstlisting}
+
+Follow live:
+\begin{lstlisting}
+docker compose logs -f --tail=100
+\end{lstlisting}
+
+\subsection{Single container logs}
+If you know the container name:
+\begin{lstlisting}
+docker logs --tail=200 CONTAINER_NAME
+\end{lstlisting}
+
+\subsection{What to look for}
+Most real failures fall into a few categories:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Ports}: ``address already in use'' (port conflict).
+  \item \textbf{Permissions}: ``permission denied'' (volume ownership).
+  \item \textbf{Database}: ``cannot connect'' (DB not ready or wrong credentials).
+  \item \textbf{Disk}: ``no space left on device''.
+\end{itemize}
+
+\encourage{When something breaks: do not guess. Read the last 50--200 lines of logs. The clue is usually there.}
+
+\section{Safety checks (weekly or monthly)}
+This is a short checklist that prevents most disasters.
+
+\subsection{1) Disk space}
+Check disk usage:
+\begin{lstlisting}
+df -h
+\end{lstlisting}
+
+If Docker images are filling the disk:
+\begin{lstlisting}
+docker system df
+docker image prune
+\end{lstlisting}
+
+\subsection{2) Are containers restarting repeatedly?}
+If a container keeps restarting, you will usually see it in:
+\begin{lstlisting}
+docker ps
+\end{lstlisting}
+Look for high restart counts.
+
+Then check its logs.
+
+\subsection{3) Confirm your backups exist (and are recent)}
+Backups that do not exist are not backups.
+Backups you have never tested are ``hope''.
+
+\encourage{If you do only one mature thing: make backups boring and automatic.}
+
+\section{Backups (simple, realistic guidance)}
+A full backup strategy can become complex. Start simple.
+
+\subsection{What to back up}
+At minimum:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Your originals:} photos/music/files under \texttt{/srv/photos}, \texttt{/srv/music}, \texttt{/srv/drive}
+  \item \textbf{Your configs:} Compose folders under \texttt{/srv/docker/compose}
+\end{itemize}
+
+These two categories are enough to rebuild the entire system after a failure.
+
+\subsection{A simple approach: copy \texttt{/srv} to an external drive}
+If you have an external disk mounted at \texttt{/mnt/backup}, you can do:
+
+\begin{lstlisting}
+sudo rsync -aH --delete /srv/ /mnt/backup/srv/
+\end{lstlisting}
+
+\textbf{What this does:}
+\begin{itemize}[leftmargin=*]
+  \item \texttt{rsync} copies efficiently (only changes),
+  \item \texttt{--delete} keeps the backup mirror clean (be careful),
+  \item you end with a mirror copy of \texttt{/srv}.
+\end{itemize}
+
+\subsection{How often?}
+\begin{itemize}[leftmargin=*]
+  \item If you add files daily: daily backups.
+  \item If you add files weekly: weekly backups.
+\end{itemize}
+
+\subsection{A minimal ``restore test''}
+Once in a while, pick one file and restore it from backup to confirm the backup is real.
+
+\section{Security hygiene (small habits with big impact)}
+\subsection{Passwords}
+Use strong passwords for:
+\begin{itemize}[leftmargin=*]
+  \item Nextcloud admin,
+  \item Seafile admin,
+  \item PhotoPrism admin,
+  \item Open WebUI user.
+\end{itemize}
+
+\subsection{Updates}
+Outdated services are a common source of security issues. Even a simple monthly update helps.
+
+\subsection{Remote access}
+Prefer VPN (Appendix~\ref{app:vpn}) over public exposure if you do not want to manage TLS and reverse proxies.
+
+\section{If something goes wrong: a calm recovery recipe}
+\begin{enumerate}[leftmargin=*]
+  \item Check what is running: \texttt{docker ps}
+  \item Check logs: \texttt{docker compose logs --tail=200}
+  \item If needed, restart the stack: \texttt{docker compose down \&\& docker compose up -d}
+  \item If still broken after an update, consider rolling back by pinning an older image tag (advanced).
+\end{enumerate}
+
+\encourage{Most failures are not catastrophic. They are usually one mis-typed variable, one full disk, or one service that needs a restart. You have the tools now.}
+
+\section{Closing note}
+You now have a documented self-hosted stack:
+photos, music, local AI, and a private drive, plus optional VPN access.
+
+The system will never be ``set and forget'' forever, but it also does not need to be stressful.
+A small routine---updates, logs, backups---is what makes digital sovereignty sustainable. 

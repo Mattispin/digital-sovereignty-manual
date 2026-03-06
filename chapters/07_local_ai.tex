@@ -1,0 +1,507 @@
+% chapters/07_local_ai.tex
+\chapter{Local AI: private assistants on your own machine}
+\label{ch:local_ai}
+
+\begin{center}
+  \vspace{0.6cm}
+  \includegraphics[width=0.38\textwidth]{servidor_nube}
+  \vspace{0.8cm}
+\end{center}
+
+
+\section{Goal (what you will achieve)}
+This chapter explains what ``local AI'' means and how to run it privately on your own hardware.
+It also gives you a practical mental model of different types of AI models (chat, code, writing, vision),
+so you can choose the right tool without getting lost in hype.
+
+By the end, you will:
+\begin{itemize}[leftmargin=*]
+  \item understand what it means to run an AI model locally (and why it matters),
+  \item know the difference between the most common model families (general chat vs. coding vs. writing),
+  \item have a simple local setup in Docker: \textbf{Ollama} (model runner) + \textbf{Open WebUI} (a friendly interface),
+  \item be able to load at least one model and run your first private conversation.
+\end{itemize}
+
+\encourage{If you have ever thought ``AI is useful, but I do not want to upload my private documents'', this chapter is for you. Local AI is not magic. It is just software running on your computer.}
+
+\section{What is ``local AI'' (plain language)}
+Most people use AI through a website. Your text is sent to a remote server, processed there, and the answer comes back.
+
+\textbf{Local AI} means:
+\begin{itemize}[leftmargin=*]
+  \item the model runs on your own machine (server, desktop, workstation),
+  \item prompts and data stay local (unless you explicitly send them out),
+  \item you control upgrades, storage, and access.
+\end{itemize}
+
+This can be slower than cloud AI if your hardware is modest, but the privacy and control are often worth it.
+
+\section{Hardware expectations (honest and beginner-friendly)}
+You can run local AI on many machines, but performance depends mostly on:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{GPU and VRAM} (biggest difference for speed and model size),
+  \item \textbf{RAM} (helps with multitasking and larger contexts),
+  \item \textbf{CPU} (fine for small models; slower for bigger ones).
+\end{itemize}
+
+\subsection*{A practical rule of thumb}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{No GPU}: run smaller models, expect slower responses.
+  \item \textbf{GPU with 8--12 GB VRAM}: a comfortable entry point for many ``7B--8B'' models.
+  \item \textbf{GPU with 16--24 GB VRAM}: more room for larger models or higher quality settings.
+\end{itemize}
+
+\encourage{You do not need a monster GPU to start. The goal is usefulness, not winning a benchmark contest.}
+
+\section{Model types: which model for which job?}
+AI models are not all the same. Many are specialized.
+
+\subsection{General chat models (``good at many things'')}
+These are the everyday assistants: summarization, brainstorming, explanations, planning.
+Good when you want a balanced model.
+
+Typical examples (names change over time, but the idea is stable):
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Llama (Instruct)} family: general-purpose chat, often strong overall.
+  \item \textbf{Qwen (Instruct)} family: strong general reasoning, often good multilingual support.
+  \item \textbf{Mistral / Mixtral} family: fast, efficient, often good quality for their size.
+\end{itemize}
+
+\subsection{Coding models (``better at code than prose'')}
+These are tuned to write, debug, and explain code.
+They are especially useful for:
+\begin{itemize}[leftmargin=*]
+  \item programming assistance,
+  \item reading logs and config files,
+  \item generating Docker Compose files and scripts,
+  \item refactoring.
+\end{itemize}
+
+Typical examples:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Qwen2.5-Coder}: strong for code generation and reasoning about code.
+  \item \textbf{DeepSeek-Coder}: often strong for coding tasks and technical instructions.
+  \item \textbf{Code Llama}: a coding-tuned variant of Llama models.
+\end{itemize}
+
+\encourage{If your main goal is ``help me with code'', start with a coding model. A general chat model can code, but a coding model usually feels more confident and consistent.}
+
+\subsection{Writing-focused models (``tone, clarity, structure'')}
+Some models feel especially good at:
+\begin{itemize}[leftmargin=*]
+  \item rewriting text,
+  \item improving clarity,
+  \item producing professional tone,
+  \item drafting letters, proposals, or documentation.
+\end{itemize}
+
+In practice, many ``general chat'' models already do this well, but you may prefer models that feel smoother or more stylistically consistent.
+(You can also tune outputs via prompts: ``be concise'', ``be friendly'', etc.)
+
+\subsection{Reasoning vs. speed (small models vs. larger models)}
+Model size often trades off with speed:
+\begin{itemize}[leftmargin=*]
+  \item smaller models: faster, cheaper, sometimes less reliable on complex reasoning,
+  \item larger models: slower, more memory, often better reasoning and writing quality.
+\end{itemize}
+
+A good setup is to have:
+\begin{itemize}[leftmargin=*]
+  \item one \textbf{fast small model} for quick tasks,
+  \item one \textbf{stronger model} for harder tasks (research, long writing, complex debugging).
+\end{itemize}
+
+\section{Our local AI stack: Ollama + Open WebUI}
+To keep the manual simple, we use:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Ollama}: downloads and runs local models,
+  \item \textbf{Open WebUI}: a browser interface to chat with those models.
+\end{itemize}
+
+This stack is popular because it is:
+\begin{itemize}[leftmargin=*]
+  \item easy to deploy with Docker,
+  \item easy to update,
+  \item flexible: you can add models later without changing the infrastructure.
+\end{itemize}
+
+\section{Folder layout}
+We keep AI data in one place:
+
+\begin{itemize}[leftmargin=*]
+  \item \texttt{/srv/ai/ollama} --- model files
+  \item \texttt{/srv/ai/openwebui} --- Open WebUI data
+  \item \texttt{/srv/docker/compose/local-ai} --- Compose files
+\end{itemize}
+
+Create folders:
+
+\begin{lstlisting}
+mkdir -p /srv/docker/compose/local-ai
+mkdir -p /srv/ai/{ollama,openwebui}
+\end{lstlisting}
+
+\section{Step 1 --- Create the Compose project}
+Go to the folder:
+
+\begin{lstlisting}
+cd /srv/docker/compose/local-ai
+\end{lstlisting}
+
+\subsection{1.1 Create \texttt{docker-compose.yml}}
+Create the file:
+
+\begin{lstlisting}
+nano docker-compose.yml
+\end{lstlisting}
+
+Paste:
+
+\begin{lstlisting}
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - /srv/ai/ollama:/root/.ollama
+    restart: unless-stopped
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    ports:
+      - "3000:8080"
+    environment:
+      OLLAMA_BASE_URL: "http://ollama:11434"
+    volumes:
+      - /srv/ai/openwebui:/app/backend/data
+    depends_on:
+      - ollama
+    restart: unless-stopped
+\end{lstlisting}
+
+\subsection{GPU note (optional)}
+If your server has an NVIDIA GPU and you want to use it, you may need to enable GPU support in Docker.
+This depends on your system (Linux vs Windows, driver setup).
+We keep GPU configuration out of the default Compose file to avoid breaking beginner installs.
+
+\encourage{Start CPU-only first. Once everything works, adding GPU acceleration is an upgrade, not a requirement.}
+
+\section{Step 2 --- Start the local AI stack}
+Start:
+
+\begin{lstlisting}
+docker compose up -d
+\end{lstlisting}
+
+Check:
+
+\begin{lstlisting}
+docker ps
+\end{lstlisting}
+
+Logs (if needed):
+
+\begin{lstlisting}
+docker compose logs -f --tail=100
+\end{lstlisting}
+
+\section{Step 3 --- Open the web interface}
+Open in a browser on the same machine:
+
+\begin{lstlisting}
+http://localhost:3000
+\end{lstlisting}
+
+From another device on the same network:
+
+\begin{lstlisting}
+http://SERVER_IP:3000
+\end{lstlisting}
+
+\subsection*{First-time setup}
+Open WebUI typically asks you to create the first user (admin).
+Do that in the browser.
+
+\encourage{If you see the WebUI login screen, you are done with infrastructure. The rest is just choosing models.}
+
+\section{Step 4 --- Download your first model}
+You have two easy options:
+
+\subsection*{Option A: download from the WebUI}
+Open WebUI usually provides a model management section where you can pull models.
+
+\subsection*{Option B: download from the terminal (always works)}
+In your terminal:
+
+\begin{lstlisting}
+docker exec -it ollama ollama pull llama3.1:8b
+\end{lstlisting}
+
+\textbf{What this does:} downloads a general-purpose ``8B'' model (good balance for many tasks). \\
+\textbf{Why this is a good first model:} it is usually small enough to run on many machines, but strong enough to be useful.
+
+\encourage{The first model download can take a while. That is normal. After that, chatting is instant compared to downloading.}
+
+\section{Step 5 --- Try three small practical prompts}
+Try these in Open WebUI to validate your setup:
+
+\subsection*{General assistant}
+\begin{quote}
+Summarize the main idea of digital sovereignty in 5 bullet points.
+\end{quote}
+
+\subsection*{Writing help}
+\begin{quote}
+Rewrite this paragraph to be clearer and friendlier, without changing meaning: [paste text].
+\end{quote}
+
+\subsection*{Coding help}
+\begin{quote}
+Explain what this Docker Compose service does and how to troubleshoot it: [paste YAML].
+\end{quote}
+
+\section{Verification checklist}
+You are done when:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{docker ps} shows \texttt{ollama} and \texttt{open-webui} running,
+  \item \texttt{http://localhost:3000} loads the Open WebUI page,
+  \item you pulled at least one model successfully,
+  \item you can chat with the model and get responses.
+\end{itemize}
+
+\section{Common pitfalls (and quick fixes)}
+\subsection{1) ``WebUI loads, but no models appear''}
+\begin{itemize}[leftmargin=*]
+  \item Pull a model explicitly:
+\end{itemize}
+\begin{lstlisting}
+docker exec -it ollama ollama pull llama3.1:8b
+\end{lstlisting}
+\begin{itemize}[leftmargin=*]
+  \item Then refresh the WebUI.
+\end{itemize}
+
+\subsection{2) ``Ollama connection error''}
+Check the containers:
+\begin{lstlisting}
+docker ps
+\end{lstlisting}
+Check logs:
+\begin{lstlisting}
+docker compose logs -f --tail=100
+\end{lstlisting}
+Make sure the WebUI points to:
+\begin{lstlisting}
+http://ollama:11434
+\end{lstlisting}
+
+\subsection{3) Slow responses}
+This usually means CPU inference or a model that is too large for your hardware.
+\begin{itemize}[leftmargin=*]
+  \item Try a smaller model.
+  \item If you have a GPU, consider enabling GPU support later.
+\end{itemize}
+\encourage{Slow is not broken. Start small, get a win, then scale up.}
+
+\subsection{4) Running out of disk space}
+Models can be large. If disk fills up:
+\begin{itemize}[leftmargin=*]
+  \item remove unused models,
+  \item move \texttt{/srv/ai/ollama} to a larger disk and remap the volume.
+\end{itemize}
+
+\begin{center}
+  \includegraphics[width=0.25\textwidth]{servidor_GPU}
+\end{center}
+
+\section{Optional upgrade: enable NVIDIA GPU acceleration (big speed boost)}
+If you have an NVIDIA GPU, enabling it can make local AI dramatically faster.
+This section is optional: your setup works fine on CPU-only, but GPU is the difference between
+``usable'' and ``wow'' for many models.
+
+\begin{lstlisting}
+CPU inference
+-------------
+User -> Ollama container -> CPU
+
+
+GPU inference
+-------------
+User -> Ollama container -> NVIDIA GPU
+\end{lstlisting}
+
+
+
+\subsection{Goal (what you will achieve)}
+By the end of this section, you will:
+\begin{itemize}[leftmargin=*]
+  \item confirm your system sees the NVIDIA GPU,
+  \item enable GPU access inside Docker for the \texttt{ollama} container,
+  \item verify that Ollama is actually using the GPU.
+\end{itemize}
+
+\encourage{If you already have a GPU: you are one small configuration step away from a huge upgrade.}
+
+\subsection{Prerequisites (what must be true first)}
+\begin{itemize}[leftmargin=*]
+  \item Your \texttt{ollama + open-webui} stack already works on CPU (you can open WebUI and chat).
+  \item You have an NVIDIA GPU with drivers installed on the host system.
+\end{itemize}
+
+\subsection{GPU Step A --- Verify the GPU is visible on your system}
+\paragraph{Linux (Path A)}
+Run on the host:
+\begin{lstlisting}
+nvidia-smi
+\end{lstlisting}
+If you see a table with your GPU name and driver version, the host driver is OK.
+
+\paragraph{Windows + WSL2 (Path B)}
+First, verify in Windows (PowerShell or CMD):
+\begin{lstlisting}
+nvidia-smi
+\end{lstlisting}
+Then verify inside Ubuntu (WSL terminal):
+\begin{lstlisting}
+nvidia-smi
+\end{lstlisting}
+If \texttt{nvidia-smi} works in WSL too, WSL GPU support is active.
+
+\subsection{GPU Step B (Linux) --- Install the NVIDIA Container Toolkit (one-time setup)}
+If you already have NVIDIA drivers working (GPU Step A), this is the missing piece that lets Docker containers see the GPU.
+
+\encourage{This looks long, but it is a one-time setup. Once done, every GPU-enabled container becomes dramatically faster.}
+
+\subsubsection*{Quickstart (Ubuntu/Debian)}
+Run the following commands on the server:
+
+\begin{lstlisting}
+# Add NVIDIA Container Toolkit repository key
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+  | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+# Add the repository list
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+  | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+# Install the toolkit
+sudo apt update && sudo apt install -y nvidia-container-toolkit
+
+# Configure Docker runtime and restart Docker
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+\end{lstlisting}
+
+\textbf{What this does (in one line each):}
+\begin{itemize}[leftmargin=*]
+  \item Adds NVIDIA’s package repository (so you can install the toolkit with \texttt{apt}).
+  \item Installs the toolkit (\texttt{nvidia-container-toolkit}).
+  \item Configures Docker so containers can use the NVIDIA runtime.
+  \item Restarts Docker to apply the new configuration.
+\end{itemize}
+
+\textbf{If this fails:} NVIDIA occasionally changes repository details.
+In that case, follow the official NVIDIA Container Toolkit installation guide for your distribution.
+
+\encourage{This looks scary, but it is a standard requirement: ``drivers on the host + toolkit for containers''.}
+
+
+\subsection*{Windows + WSL2 (Path B): Docker Desktop settings}
+In Docker Desktop:
+\begin{itemize}[leftmargin=*]
+  \item Ensure Docker Desktop is running.
+  \item Ensure WSL integration is enabled for your Ubuntu distro.
+\end{itemize}
+On most modern setups, GPU pass-through works automatically once WSL GPU support is enabled.
+
+\subsection{GPU Step C --- Update the Compose file to request the GPU}
+Edit your local AI Compose file:
+\begin{lstlisting}
+cd /srv/docker/compose/local-ai
+nano docker-compose.yml
+\end{lstlisting}
+
+Inside the \texttt{ollama:} service, add the following block:
+
+\begin{lstlisting}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+\end{lstlisting}
+
+So \texttt{ollama} becomes:
+
+\begin{lstlisting}
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - /srv/ai/ollama:/root/.ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+\end{lstlisting}
+
+\encourage{YAML is indentation-sensitive. If it fails, it is usually one missing space, not your GPU.}
+
+\subsection{GPU Step D --- Restart the stack}
+Apply the change:
+\begin{lstlisting}
+docker compose down
+docker compose up -d
+\end{lstlisting}
+
+\section{Verification checklist (GPU)}
+You are done when:
+\begin{itemize}[leftmargin=*]
+  \item the containers are running: \texttt{docker ps}
+  \item you can still open WebUI: \texttt{http://localhost:3000}
+  \item GPU appears inside the Ollama container (see below).
+\end{itemize}
+
+\subsection*{Verification command (works everywhere)}
+Run:
+\begin{lstlisting}
+docker exec -it ollama nvidia-smi
+\end{lstlisting}
+You should see the same GPU table that appeared on the host. If you see the GPU table \emph{from inside the container}, GPU pass-through is working.
+
+\encourage{If \texttt{docker exec ... nvidia-smi} works, you have GPU acceleration. That is the whole game.}
+
+\section{Common pitfalls (GPU)}
+\subsection*{1) \texttt{nvidia-smi} works on host, but not inside container}
+On Linux, this usually means the NVIDIA container runtime/toolkit is missing or Docker was not restarted.
+
+\subsection*{2) Windows works, but WSL \texttt{nvidia-smi} fails}
+That means WSL GPU support is not active yet. Update NVIDIA drivers and ensure WSL2 is enabled.
+
+\subsection*{3) Docker Compose ignores the GPU block}
+Make sure you are using \texttt{docker compose} (plugin) and not an outdated legacy tool.
+Check:
+\begin{lstlisting}
+docker compose version
+\end{lstlisting}
+
+\subsection*{4) Still slow even with GPU}
+Some models are simply heavy. Try a smaller model first (7B/8B),
+then scale up once you confirm the GPU path works.
+
+
+\section{Next step}
+Next, we set up the private drive (file sync and organization).
+Later, you can also integrate local AI with your documents (RAG-style search over your own files),
+but first we build the stable storage layer. 

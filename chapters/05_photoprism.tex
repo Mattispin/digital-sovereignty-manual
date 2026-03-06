@@ -1,0 +1,295 @@
+% chapters/03_photoprism.tex
+\chapter{PhotoPrism: your private photo library}
+\label{ch:photoprism}
+
+
+\begin{center}
+  \vspace{0.6cm}
+  \includegraphics[width=0.38\textwidth]{serivdor_foto_v4}
+  \vspace{0.8cm}
+\end{center}
+
+
+\section{Goal (what you will achieve)}
+In this chapter you will install PhotoPrism, a self-hosted photo management app that helps you:
+\begin{itemize}[leftmargin=*]
+  \item browse your photo archive from any browser on your network,
+  \item import and index photos without handing them to a third party,
+  \item search, tag, and organize your library with modern features.
+\end{itemize}
+
+\encourage{This chapter is where the project starts to feel real. Once PhotoPrism opens in your browser, you are no longer ``installing Docker''---you are building your own digital home.}
+
+\section{What is PhotoPrism (plain language)}
+PhotoPrism is a web app you host yourself. It scans your photo folders, builds an index, and lets you browse and search your library from a clean web interface.
+It runs well in Docker, and the recommended way to run it is with Docker Compose. :contentReference[oaicite:1]{index=1}
+
+\section{Prerequisites}
+\begin{itemize}[leftmargin=*]
+  \item Docker and Docker Compose working (Chapter 2 or 3).
+  \item A folder where your photos will live (we use \texttt{/srv/photos}).
+  \item A bit of patience for the first indexing (it can take time on large libraries).
+\end{itemize}
+
+\section{Folder layout (what goes where)}
+We will keep things simple and predictable:
+
+\begin{itemize}[leftmargin=*]
+  \item \texttt{/srv/photos/originals} --- your original photo/video files (the important part!)
+  \item \texttt{/srv/photos/import} --- optional folder for importing new files into PhotoPrism
+  \item \texttt{/srv/photos/storage} --- PhotoPrism internal storage (thumbnails, index, cache)
+  \item \texttt{/srv/docker/compose/photoprism} --- Compose file and environment file
+\end{itemize}
+
+Create folders (Linux path; on WSL2, run the same inside Ubuntu):
+
+\begin{lstlisting}
+mkdir -p /srv/docker/compose/photoprism
+mkdir -p /srv/photos/{originals,import,storage,mariadb}
+\end{lstlisting}
+
+\encourage{Do not store your originals inside the container. Keep them in /srv/photos/originals so you can back them up and move them whenever you want.}
+
+\section{Step 1 --- Create the Compose project}
+Go to the PhotoPrism Compose folder:
+
+\begin{lstlisting}
+cd /srv/docker/compose/photoprism
+\end{lstlisting}
+
+\subsection{1.1 Create an environment file}
+Create \texttt{.env} (this keeps passwords out of the YAML):
+
+\begin{lstlisting}
+nano .env
+\end{lstlisting}
+
+Paste and edit:
+
+\begin{lstlisting}
+# --- PhotoPrism admin login ---
+PHOTOPRISM_ADMIN_USER=admin
+PHOTOPRISM_ADMIN_PASSWORD=CHANGE_THIS_TO_A_LONG_PASSWORD
+
+# --- Database (MariaDB) ---
+MARIADB_DATABASE=photoprism
+MARIADB_USER=photoprism
+MARIADB_PASSWORD=CHANGE_THIS_DB_PASSWORD
+MARIADB_ROOT_PASSWORD=CHANGE_THIS_ROOT_PASSWORD
+
+# --- Optional: match your Linux user (helps avoid permission issues) ---
+# On Linux, these can often be left as-is if your user is UID/GID 1000.
+# On Windows/macOS, setting them explicitly can help if you see permission errors.
+PHOTOPRISM_UID=1000
+PHOTOPRISM_GID=1000
+\end{lstlisting}
+
+\textbf{Why this matters:}
+\begin{itemize}[leftmargin=*]
+  \item PhotoPrism needs an admin password.
+  \item MariaDB needs credentials.
+  \item Keeping secrets in \texttt{.env} is cleaner and safer than hardcoding them in YAML.
+\end{itemize}
+
+\encourage{Yes, set real passwords. Future-you will thank present-you.}
+
+\subsection{1.2 Create \texttt{docker-compose.yml}}
+Create the Compose file:
+
+\begin{lstlisting}
+nano docker-compose.yml
+\end{lstlisting}
+
+Paste:
+
+\begin{lstlisting}
+services:
+  mariadb:
+    image: mariadb:11
+    container_name: photoprism-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${MARIADB_DATABASE}
+      MARIADB_USER: ${MARIADB_USER}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+    volumes:
+      - /srv/photos/mariadb:/var/lib/mysql
+
+  photoprism:
+    image: photoprism/photoprism:latest
+    container_name: photoprism
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+    ports:
+      - "2342:2342"
+    environment:
+      PHOTOPRISM_ADMIN_USER: ${PHOTOPRISM_ADMIN_USER}
+      PHOTOPRISM_ADMIN_PASSWORD: ${PHOTOPRISM_ADMIN_PASSWORD}
+
+      # Database config (PhotoPrism supports sqlite or mysql; MariaDB uses mysql driver)
+      PHOTOPRISM_DATABASE_DRIVER: "mysql"
+      PHOTOPRISM_DATABASE_SERVER: "mariadb:3306"
+      PHOTOPRISM_DATABASE_NAME: ${MARIADB_DATABASE}
+      PHOTOPRISM_DATABASE_USER: ${MARIADB_USER}
+      PHOTOPRISM_DATABASE_PASSWORD: ${MARIADB_PASSWORD}
+
+      # File permissions (often helps on Linux; may be useful on Windows/macOS too)
+      PHOTOPRISM_UID: ${PHOTOPRISM_UID}
+      PHOTOPRISM_GID: ${PHOTOPRISM_GID}
+
+      # Optional quality-of-life settings:
+      PHOTOPRISM_SITE_URL: "http://localhost:2342/"
+      PHOTOPRISM_ORIGINALS_LIMIT: 5000
+
+    volumes:
+      - /srv/photos/originals:/photoprism/originals
+      - /srv/photos/import:/photoprism/import
+      - /srv/photos/storage:/photoprism/storage
+\end{lstlisting}
+
+\textbf{Notes:}
+\begin{itemize}[leftmargin=*]
+  \item PhotoPrism’s default port is \texttt{2342}. :contentReference[oaicite:2]{index=2}
+  \item Database variables follow PhotoPrism config options for MySQL/MariaDB. :contentReference[oaicite:3]{index=3}
+\end{itemize}
+
+\encourage{If YAML feels fragile: it is. Indentation matters. If something fails, it is usually one missing space, not a life problem.}
+
+\section{Step 2 --- Start PhotoPrism}
+Start the stack:
+
+\begin{lstlisting}
+docker compose up -d
+\end{lstlisting}
+
+Check containers:
+
+\begin{lstlisting}
+docker ps
+\end{lstlisting}
+
+\subsection{View logs (first debugging tool)}
+If something does not start:
+
+\begin{lstlisting}
+docker compose logs -f --tail=100
+\end{lstlisting}
+
+\section{Step 3 --- Open PhotoPrism in your browser}
+On the same machine:
+\begin{lstlisting}
+http://localhost:2342
+\end{lstlisting}
+
+From another device on the same network:
+\begin{lstlisting}
+http://SERVER_IP:2342
+\end{lstlisting}
+
+Log in with the admin user/password from your \texttt{.env} file.
+
+\encourage{If the login page loads: you are already winning. Most ``server projects'' fail before this moment.}
+
+\encourage{If it works on \texttt{localhost} but not from your phone, the usual culprit is the firewall (especially on Windows). This is normal -- see the ``Access from mobile'' section and the VPN appendix (Appendix~\ref{app:vpn}).}
+
+\section{Step 4 --- Add photos and index}
+\subsection{Option A: put files directly in originals}
+Copy photos into:
+\begin{lstlisting}
+/srv/photos/originals
+\end{lstlisting}
+
+Then in PhotoPrism, use the web interface to index (or re-index) the library.
+
+\subsection{Option B: use the import folder}
+Copy files into:
+\begin{lstlisting}
+/srv/photos/import
+\end{lstlisting}
+
+Then use PhotoPrism’s import workflow in the UI.
+
+\section{Verification checklist}
+You are done when:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{docker ps} shows \texttt{photoprism} and \texttt{photoprism-mariadb} running,
+  \item \texttt{http://localhost:2342} loads the PhotoPrism login page,
+  \item you can log in and see the PhotoPrism dashboard,
+  \item after adding photos, indexing completes and photos appear.
+\end{itemize}
+
+\section{Common pitfalls (and quick fixes)}
+\subsection{1) ``Cannot connect to database''}
+Usually the database is not ready yet, or credentials do not match.
+\begin{itemize}[leftmargin=*]
+  \item Check logs: \texttt{docker compose logs -f --tail=100}
+  \item Ensure \texttt{PHOTOPRISM\_DATABASE\_*} matches the MariaDB variables in \texttt{.env}.
+  \item Restart after fixes: \texttt{docker compose down} then \texttt{docker compose up -d}
+\end{itemize}
+PhotoPrism troubleshooting notes commonly point to network/database connectivity and correct host/port. :contentReference[oaicite:4]{index=4}
+
+\subsection{2) Permission problems on mounted folders}
+Symptoms: PhotoPrism cannot write to \texttt{/photoprism/storage} or fails creating files.
+\begin{itemize}[leftmargin=*]
+  \item Make sure \texttt{/srv/photos/storage} exists and is writable.
+  \item On Linux, run: \texttt{sudo chown -R \$USER:\$USER /srv/photos}
+  \item If needed, set \texttt{PHOTOPRISM\_UID} and \texttt{PHOTOPRISM\_GID} explicitly. :contentReference[oaicite:5]{index=5}
+\end{itemize}
+
+\subsection{3) ``It is slow'' on first run}
+The first indexing generates thumbnails and builds the database. This is normal.
+\begin{itemize}[leftmargin=*]
+  \item Let it run.
+  \item Keep the machine on.
+  \item Consider indexing overnight for large libraries.
+\end{itemize}
+\encourage{Slow is not broken. The first scan is the hardest; later updates are much faster.}
+
+\subsection{4) Wrong URL/port}
+Default is \texttt{http} on port \texttt{2342}. :contentReference[oaicite:6]{index=6}
+\begin{itemize}[leftmargin=*]
+  \item Local: \texttt{http://localhost:2342}
+  \item Network: \texttt{http://SERVER\_IP:2342}
+\end{itemize}
+
+\subsection{5) Exposing PhotoPrism to the public internet too early}
+Do not expose PhotoPrism publicly until you understand reverse proxies and TLS.
+Start with LAN or VPN access. (We keep public exposure optional in this manual.)
+
+\section{Access from mobile and tablet}
+You do not need a special app to use PhotoPrism. A browser is enough.
+
+\subsection*{On the same Wi-Fi (local network)}
+\begin{itemize}[leftmargin=*]
+  \item Find the IP address of the machine running PhotoPrism (the ``server'').
+  \item On your phone/tablet browser, open:
+\end{itemize}
+
+\begin{lstlisting}
+http://SERVER_IP:2342
+\end{lstlisting}
+
+\subsection*{Outside your home (recommended: VPN)}
+If you want access while travelling, the safest beginner approach is:
+\begin{itemize}[leftmargin=*]
+  \item connect your phone to your VPN,
+  \item then use the same address:
+\end{itemize}
+
+\begin{lstlisting}
+http://SERVER_IP:2342
+\end{lstlisting}
+
+\encourage{Start with local Wi-Fi first. Once it works locally, adding VPN access is usually just one extra step, not a whole new project.}
+
+\subsection*{Make it feel like an app (Add to Home Screen)}
+Most browsers let you add the PhotoPrism page to your home screen.
+This creates an icon and opens it in an ``app-like'' full-screen mode.
+Look for \textbf{Share} $\rightarrow$ \textbf{Add to Home Screen} (wording may vary).
+
+
+\section{Next step}
+Next, we install Navidrome (music server). It is simpler than PhotoPrism:
+one container, one library folder, one web UI. 

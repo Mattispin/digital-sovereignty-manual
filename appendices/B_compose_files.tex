@@ -1,0 +1,385 @@
+% appendices/B_compose_files.tex
+\chapter{Compose Files (copy/paste reference)}
+\label{app:compose}
+
+\section{How to use this appendix}
+This appendix collects the Docker Compose files used throughout the manual in one place.
+
+\subsection*{A small bit of theory (so the files make sense)}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{YAML indentation matters.} Use spaces, not tabs.
+  \item Lines starting with \texttt{\#} are \textbf{comments} (ignored by Docker).
+  \item Many files use a \texttt{.env} file in the same folder to store passwords and variables.
+  \item Use this workflow:
+\end{itemize}
+
+\begin{lstlisting}
+cd /srv/docker/compose/SERVICE
+nano .env
+nano docker-compose.yml
+docker compose up -d
+\end{lstlisting}
+
+\encourage{Copy/paste is not cheating. It is how servers are built.}
+
+\section{B.1 PhotoPrism (with MariaDB)}
+\subsection*{Folder}
+\begin{lstlisting}
+/srv/docker/compose/photoprism
+\end{lstlisting}
+
+\subsection*{.env}
+\begin{lstlisting}
+# --- PhotoPrism admin login ---
+PHOTOPRISM_ADMIN_USER=admin
+PHOTOPRISM_ADMIN_PASSWORD=CHANGE_THIS_TO_A_LONG_PASSWORD
+
+# --- Database (MariaDB) ---
+MARIADB_DATABASE=photoprism
+MARIADB_USER=photoprism
+MARIADB_PASSWORD=CHANGE_THIS_DB_PASSWORD
+MARIADB_ROOT_PASSWORD=CHANGE_THIS_ROOT_PASSWORD
+
+# --- Optional: match your Linux user (helps avoid permission issues) ---
+PHOTOPRISM_UID=1000
+PHOTOPRISM_GID=1000
+\end{lstlisting}
+
+\subsection*{docker-compose.yml}
+\begin{lstlisting}
+services:
+  mariadb:
+    image: mariadb:11
+    container_name: photoprism-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${MARIADB_DATABASE}
+      MARIADB_USER: ${MARIADB_USER}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+    volumes:
+      - /srv/photos/mariadb:/var/lib/mysql
+
+  photoprism:
+    image: photoprism/photoprism:latest
+    container_name: photoprism
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+    ports:
+      - "2342:2342"
+    environment:
+      PHOTOPRISM_ADMIN_USER: ${PHOTOPRISM_ADMIN_USER}
+      PHOTOPRISM_ADMIN_PASSWORD: ${PHOTOPRISM_ADMIN_PASSWORD}
+
+      PHOTOPRISM_DATABASE_DRIVER: "mysql"
+      PHOTOPRISM_DATABASE_SERVER: "mariadb:3306"
+      PHOTOPRISM_DATABASE_NAME: ${MARIADB_DATABASE}
+      PHOTOPRISM_DATABASE_USER: ${MARIADB_USER}
+      PHOTOPRISM_DATABASE_PASSWORD: ${MARIADB_PASSWORD}
+
+      PHOTOPRISM_UID: ${PHOTOPRISM_UID}
+      PHOTOPRISM_GID: ${PHOTOPRISM_GID}
+
+      PHOTOPRISM_SITE_URL: "http://localhost:2342/"
+      PHOTOPRISM_ORIGINALS_LIMIT: 5000
+    volumes:
+      - /srv/photos/originals:/photoprism/originals
+      - /srv/photos/import:/photoprism/import
+      - /srv/photos/storage:/photoprism/storage
+\end{lstlisting}
+
+\section{B.2 Navidrome}
+\subsection*{Folder}
+\begin{lstlisting}
+/srv/docker/compose/navidrome
+\end{lstlisting}
+
+\subsection*{.env}
+\begin{lstlisting}
+ND_SCANSCHEDULE=1h
+ND_LOGLEVEL=info
+TZ=Europe/Madrid
+\end{lstlisting}
+
+\subsection*{docker-compose.yml}
+\begin{lstlisting}
+services:
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    restart: unless-stopped
+    ports:
+      - "4533:4533"
+    environment:
+      ND_SCANSCHEDULE: ${ND_SCANSCHEDULE}
+      ND_LOGLEVEL: ${ND_LOGLEVEL}
+      TZ: ${TZ}
+    volumes:
+      - /srv/music/data:/data
+      - /srv/music/library:/music:ro
+\end{lstlisting}
+
+\section{B.3 Local AI (Ollama + Open WebUI)}
+\subsection*{Folder}
+\begin{lstlisting}
+/srv/docker/compose/local-ai
+\end{lstlisting}
+
+\subsection*{docker-compose.yml}
+\begin{lstlisting}
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    environment:
+      TZ: Europe/Madrid
+    volumes:
+      - /srv/ai/ollama:/root/.ollama
+    restart: unless-stopped
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    ports:
+      - "3000:8080"
+    environment:
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      TZ: Europe/Madrid
+    volumes:
+      - /srv/ai/openwebui:/app/backend/data
+    depends_on:
+      - ollama
+    restart: unless-stopped
+\end{lstlisting}
+
+\subsection*{Optional: enable NVIDIA GPU acceleration (snippet)}
+If you have an NVIDIA GPU, add the following block \textbf{inside the \texttt{ollama:} service},
+at the same indentation level as \texttt{restart}, \texttt{ports}, and \texttt{volumes}.
+\textbf{Note:} GPU acceleration requires NVIDIA drivers and NVIDIA Container Toolkit (Linux) or Docker Desktop GPU support (Windows).
+
+\begin{lstlisting}
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    environment:
+      TZ: Europe/Madrid
+    volumes:
+      - /srv/ai/ollama:/root/.ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+\end{lstlisting}
+
+Then restart the stack:
+\begin{lstlisting}
+docker compose down
+docker compose up -d
+\end{lstlisting}
+
+\subsection*{Verification}
+First, verify GPU on the host:
+\begin{lstlisting}
+nvidia-smi
+docker ps
+\end{lstlisting}
+
+If available inside the container (not always):
+\begin{lstlisting}
+docker exec -it ollama nvidia-smi
+\end{lstlisting}
+
+If your Compose ignores \texttt{deploy:} on your system, see Chapter 7 (GPU troubleshooting) for the alternative \texttt{--gpus all} approach.
+
+\section{B.4 Nextcloud (core stack)}
+\subsection*{Folder}
+\begin{lstlisting}
+/srv/docker/compose/nextcloud
+\end{lstlisting}
+
+\subsection*{.env}
+\begin{lstlisting}
+MYSQL_DATABASE=nextcloud
+MYSQL_USER=nextcloud
+MYSQL_PASSWORD=CHANGE_THIS_DB_PASSWORD
+MYSQL_ROOT_PASSWORD=CHANGE_THIS_ROOT_PASSWORD
+
+NEXTCLOUD_ADMIN_USER=admin
+NEXTCLOUD_ADMIN_PASSWORD=CHANGE_THIS_TO_A_LONG_PASSWORD
+
+# Space-separated:
+NEXTCLOUD_TRUSTED_DOMAINS=localhost 127.0.0.1 SERVER_IP
+
+TZ=Europe/Madrid
+\end{lstlisting}
+
+\subsection*{docker-compose.yml (core)}
+\begin{lstlisting}
+services:
+  db:
+    image: mariadb:11
+    container_name: nextcloud-db
+    restart: unless-stopped
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: ${TZ}
+    volumes:
+      - /srv/drive/nextcloud/db:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    container_name: nextcloud-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - /srv/drive/nextcloud/redis:/data
+
+  app:
+    image: nextcloud:apache
+    container_name: nextcloud
+    restart: unless-stopped
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8080:80"
+    environment:
+      MYSQL_HOST: db
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER}
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
+      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_TRUSTED_DOMAINS}
+      TZ: ${TZ}
+    volumes:
+      - /srv/drive/nextcloud/html:/var/www/html
+      - /srv/drive/nextcloud/data:/var/www/html/data
+
+  cron:
+    image: nextcloud:apache
+    container_name: nextcloud-cron
+    restart: unless-stopped
+    depends_on:
+      - app
+    entrypoint: /cron.sh
+    volumes:
+      - /srv/drive/nextcloud/html:/var/www/html
+      - /srv/drive/nextcloud/data:/var/www/html/data
+\end{lstlisting}
+
+\subsection*{Optional: add OnlyOffice Docs (service snippet)}
+Add inside \texttt{services:}:
+
+\begin{lstlisting}
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: onlyoffice
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      JWT_ENABLED: "true"
+      JWT_SECRET: "CHANGE_THIS_TO_A_LONG_RANDOM_SECRET"
+    ports:
+      - "8081:80"
+\end{lstlisting}
+
+\section{B.5 Seafile (core stack)}
+\subsection*{Folder}
+\begin{lstlisting}
+/srv/docker/compose/seafile
+\end{lstlisting}
+
+\subsection*{.env}
+\begin{lstlisting}
+SEAFILE_SERVER_HOSTNAME=SERVER_IP
+
+SEAFILE_ADMIN_EMAIL=admin@example.com
+SEAFILE_ADMIN_PASSWORD=CHANGE_THIS_TO_A_LONG_PASSWORD
+
+MYSQL_ROOT_PASSWORD=CHANGE_THIS_ROOT_PASSWORD
+MYSQL_LOG_CONSOLE=true
+
+TZ=Europe/Madrid
+\end{lstlisting}
+
+\subsection*{docker-compose.yml (core)}
+\begin{lstlisting}
+services:
+  db:
+    image: mariadb:11
+    container_name: seafile-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_LOG_CONSOLE: ${MYSQL_LOG_CONSOLE}
+      TZ: ${TZ}
+    volumes:
+      - /srv/drive/seafile-db:/var/lib/mysql
+
+  memcached:
+    image: memcached:1.6-alpine
+    container_name: seafile-memcached
+    restart: unless-stopped
+
+  seafile:
+    image: seafileltd/seafile-mc:latest
+    container_name: seafile
+    restart: unless-stopped
+    depends_on:
+      - db
+      - memcached
+    ports:
+      - "8000:80"
+    environment:
+      DB_HOST: db
+      DB_ROOT_PASSWD: ${MYSQL_ROOT_PASSWORD}
+      TIME_ZONE: ${TZ}
+      SEAFILE_ADMIN_EMAIL: ${SEAFILE_ADMIN_EMAIL}
+      SEAFILE_ADMIN_PASSWORD: ${SEAFILE_ADMIN_PASSWORD}
+      SEAFILE_SERVER_HOSTNAME: ${SEAFILE_SERVER_HOSTNAME}
+    volumes:
+      - /srv/drive/seafile:/shared
+\end{lstlisting}
+
+\subsection*{Optional: add OnlyOffice Docs (service snippet)}
+Add inside \texttt{services:}:
+
+\begin{lstlisting}
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: seafile-onlyoffice
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      JWT_ENABLED: "true"
+      JWT_SECRET: "CHANGE_THIS_TO_A_LONG_RANDOM_SECRET"
+    ports:
+      - "8001:80"
+\end{lstlisting}
+
+
+
+
+\section{B.6 Notes on placeholders}
+Replace these placeholders before running:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{SERVER\_IP} with your server IP (see Chapter~\ref{ch:theory_compose_yaml}),
+  \item passwords marked \texttt{CHANGE\_THIS\_*} with strong passwords,
+  \item emails like \texttt{admin@example.com} with your real admin email.
+\end{itemize}
+
+\encourage{If you keep your Compose files and \texttt{/srv} backups, you can rebuild the entire system. That is the quiet superpower of this manual.} 

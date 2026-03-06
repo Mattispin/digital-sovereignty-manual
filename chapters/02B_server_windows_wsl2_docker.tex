@@ -1,0 +1,349 @@
+% chapters/02B_server_windows_wsl2_docker.tex
+\chapter{Server Path B: Windows + WSL2 + Docker (beginner-friendly)}
+\label{ch:server_windows_wsl2_docker}
+
+\begin{center}
+  \vspace{0.6cm}
+  \includegraphics[width=0.38\textwidth]{serivdor_mira_pasear_pinguino_v2}
+  \vspace{0.8cm}
+\end{center}
+
+
+
+\section{Goal (what you will achieve)}
+This chapter helps you build the same foundation as Path A, but starting from Windows.
+
+By the end, you will have:
+\begin{itemize}[leftmargin=*]
+  \item Windows prepared with WSL2 (a real Linux environment inside Windows),
+  \item an Ubuntu Linux terminal you can open from the Start menu,
+  \item Docker installed and working \emph{via Docker Desktop} (recommended for beginners),
+  \item Docker Compose available,
+  \item a clean data layout (persistent folders) so containers can be upgraded safely.
+\end{itemize}
+
+\section{Who should choose this path?}
+Choose \textbf{Path B} if:
+\begin{itemize}[leftmargin=*]
+  \item you already use Windows and want to start without reinstalling your machine,
+  \item you are not comfortable installing Linux directly yet,
+  \item you want a gentle, guided learning path.
+\end{itemize}
+
+\textbf{Good to know:} this path adds one extra layer (Windows + Linux).
+It works well for learning and small self-hosted stacks, but a dedicated Linux server is usually simpler long-term.
+
+\section{Big picture (in plain language)}
+\subsection{What is WSL2?}
+WSL2 stands for \textbf{Windows Subsystem for Linux 2}. It lets Windows run a real Linux system in the background.
+
+Think of it like this:
+\begin{itemize}[leftmargin=*]
+  \item Windows is your main computer environment.
+  \item WSL2 is a small Linux computer \emph{inside} Windows.
+  \item You open an \textbf{Ubuntu app} to get a Linux terminal.
+\end{itemize}
+
+\subsection{What is Docker Desktop? (and why we use it here)}
+Docker Desktop is the easiest way for beginners to run Docker on Windows.
+It integrates with WSL2 so you can run Docker commands from the Ubuntu terminal.
+
+In this manual, \textbf{Path B assumes Docker Desktop}, because it avoids advanced system configuration.
+
+\encourage{Mental model: you type Docker commands in the Ubuntu terminal, but the Docker engine is running in Docker Desktop on Windows. Ubuntu is your control panel; Docker Desktop is the motor.}
+
+\section{Before you start (requirements)}
+\begin{itemize}[leftmargin=*]
+  \item Windows 10/11 with administrator access.
+  \item Internet connection.
+  \item Enough disk space (at least 30--50 GB free is a comfortable start).
+\end{itemize}
+
+\section{Step 1 --- Install WSL2}
+\subsection{1.1 Open PowerShell as Administrator}
+\textbf{How:}
+\begin{itemize}[leftmargin=*]
+  \item Click Start.
+  \item Type \texttt{PowerShell}.
+  \item Right-click \textbf{Windows PowerShell} and choose \textbf{Run as administrator}.
+\end{itemize}
+
+\encourage{This looks more serious than it is. ``Run as administrator'' just gives permission to enable Windows features. You are not breaking anything---you are switching on the Linux subsystem that Windows already supports.}
+
+\subsection{1.2 Install WSL with Ubuntu}
+In the admin PowerShell window, run:
+\begin{lstlisting}
+wsl --install
+\end{lstlisting}
+
+\textbf{What this does:}
+\begin{itemize}[leftmargin=*]
+  \item enables the Windows features required for WSL,
+  \item installs WSL2,
+  \item installs a default Linux distribution (usually Ubuntu).
+\end{itemize}
+
+\textbf{Why you do it:} it creates the Linux environment where we will run server commands.
+
+\subsection{1.3 Reboot if Windows asks you to}
+WSL installation often requires a restart.
+
+\subsection{1.4 Confirm WSL2 is active}
+Open a normal PowerShell (not necessarily admin) and run:
+\begin{lstlisting}
+wsl --status
+\end{lstlisting}
+
+You want to see that WSL is installed and that the default version is 2.
+
+\paragraph{If needed: set WSL2 as default.}
+\begin{lstlisting}
+wsl --set-default-version 2
+\end{lstlisting}
+
+\section{Step 2 --- Open your Linux terminal (Ubuntu)}
+This is the key beginner step: \textbf{your Linux terminal is an app.}
+
+\encourage{If you have never used Linux: perfect. In this path, Linux is just an app you open and close. You can learn it safely, step by step, without reinstalling your computer.}
+
+\subsection{2.1 Open Ubuntu from the Start menu}
+\begin{itemize}[leftmargin=*]
+  \item Click Start.
+  \item Type \texttt{Ubuntu}.
+  \item Click the Ubuntu app.
+\end{itemize}
+
+A terminal window opens. \textbf{This is Linux.}
+
+\subsection{2.2 Create your Linux username and password}
+The first time you open Ubuntu, it will ask you to create:
+\begin{itemize}[leftmargin=*]
+  \item a Linux username,
+  \item a Linux password.
+\end{itemize}
+
+\textbf{Important:} this password is for Linux inside WSL, not your Windows password.
+
+\encourage{Two normal things that confuse everyone the first time: (1) this is a new password for Ubuntu, not your Windows password, and (2) when you type it, you will not see any characters on screen. That is normal---type carefully and press Enter.}
+
+\section{Step 3 --- Update Ubuntu inside WSL}
+Now that you are in the Ubuntu terminal, run:
+
+\subsection{3.1 Refresh package lists}
+\begin{lstlisting}
+sudo apt update
+\end{lstlisting}
+\textbf{What this does:} updates the list of available packages. \\
+\textbf{Why you do it:} ensures you install current versions.
+
+\subsection{3.2 Upgrade installed packages}
+\begin{lstlisting}
+sudo apt upgrade -y
+\end{lstlisting}
+\textbf{What this does:} upgrades installed software. \\
+\textbf{Why you do it:} reduces bugs and security issues.
+
+\subsection{3.3 Install basic tools}
+\begin{lstlisting}
+sudo apt install -y curl ca-certificates gnupg lsb-release unzip
+\end{lstlisting}
+
+\section{Step 4 --- Install Docker (recommended: Docker Desktop)}
+On Windows, there are multiple ways to run Docker. For beginners, the best approach is:
+\begin{itemize}[leftmargin=*]
+  \item install \textbf{Docker Desktop} on Windows,
+  \item enable WSL integration,
+  \item run Docker commands from the Ubuntu terminal.
+\end{itemize}
+
+\subsection{4.1 Install Docker Desktop on Windows}
+\textbf{What to do:}
+\begin{itemize}[leftmargin=*]
+  \item Download and install Docker Desktop (official installer).
+  \item During setup, keep the option ``Use WSL 2 instead of Hyper-V'' enabled (recommended).
+\end{itemize}
+
+\textbf{Why we do it:} Docker Desktop handles the Windows-side details for you.
+
+\encourage{If the installer offers many options: do not overthink it. The default settings are fine. We only care that Docker Desktop runs and WSL integration is enabled.}
+
+\subsection{4.2 Enable WSL integration}
+Open Docker Desktop and go to:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Settings} $\rightarrow$ \textbf{Resources} $\rightarrow$ \textbf{WSL Integration}
+\end{itemize}
+
+Enable integration for your Ubuntu distribution.
+
+\textbf{What this does:} allows the Ubuntu terminal to use the Docker engine managed by Docker Desktop.
+
+\section{Step 5 --- Verify Docker from the Ubuntu terminal}
+In the Ubuntu terminal (WSL), run:
+
+\subsection{5.1 Docker version}
+\begin{lstlisting}
+docker --version
+\end{lstlisting}
+
+\subsection{5.2 Compose version}
+\begin{lstlisting}
+docker compose version
+\end{lstlisting}
+
+\subsection{5.3 Hello-world test}
+\begin{lstlisting}
+docker run --rm hello-world
+\end{lstlisting}
+
+If this works, Docker is correctly installed and integrated.
+
+\encourage{Nice. This is the big milestone. From here on, you are mostly repeating the same pattern: define a service in Compose, start it, and open it in your browser.}
+
+\section{Step 6 --- Create a clean data layout (WSL-friendly)}
+We use the same principle: containers are disposable; data must persist.
+
+\subsection{6.1 Create folders inside Linux}
+In the Ubuntu terminal:
+\begin{lstlisting}
+sudo mkdir -p /srv/{docker,photos,music,drive,ai,backups}
+sudo mkdir -p /srv/docker/compose
+sudo chown -R $USER:$USER /srv
+\end{lstlisting}
+
+\textbf{Why inside WSL?} It is faster and more reliable to keep Docker volumes on the Linux filesystem used by WSL.
+
+\subsection{6.2 Important note about Windows drives}
+You can access Windows folders from WSL under \texttt{/mnt/c/}, \texttt{/mnt/d/}, etc.
+However, for Docker data and databases, using the Linux filesystem (inside WSL) is usually more stable and faster.
+
+\section{Step 7 --- (Optional) Remote access}
+If you want to access your services from another device on your network, you have two options:
+\begin{itemize}[leftmargin=*]
+  \item Use Windows networking (Docker Desktop publishes ports on Windows).
+  \item Use a VPN (recommended for access outside your home).
+\end{itemize}
+
+\textbf{Beginner advice:} start local first (use your browser on the same PC), then expand to network access once everything works.
+
+\section{Verification checklist}
+Before moving on, confirm:
+\begin{itemize}[leftmargin=*]
+  \item You can open Ubuntu from the Start menu (WSL terminal).
+  \item \texttt{docker run --rm hello-world} works inside Ubuntu.
+  \item You have \texttt{/srv} created inside WSL.
+\end{itemize}
+
+\section{Troubleshooting (common issues)}
+
+\subsection{``wsl is not recognized'' in PowerShell}
+WSL is not installed or Windows is too old. Update Windows and try again.
+
+If WSL refuses to install, two common causes are:
+\begin{itemize}[leftmargin=*]
+  \item Windows is outdated.
+  \item Virtualization is disabled in BIOS/UEFI.
+\end{itemize}
+Update Windows first; if the problem persists, check that virtualization is enabled.
+
+\subsection{Ubuntu asks for a password, but nothing appears when typing}
+This is normal: Linux passwords do not show characters while you type. Type carefully and press Enter.
+
+\subsection{Docker command not found inside Ubuntu}
+Either Docker Desktop is not installed, or WSL integration is not enabled.
+Check Docker Desktop settings and enable integration for Ubuntu.
+
+\subsection{Hello-world fails with permission errors}
+Try running once with sudo:
+\begin{lstlisting}
+sudo docker run --rm hello-world
+\end{lstlisting}
+If that works, then your user is missing Docker permissions in WSL.
+Restart Docker Desktop, close and reopen Ubuntu, and try again.
+
+\section{Next step}
+Next, you can install the first service (PhotoPrism) using Docker Compose.
+From this point onward, the service chapters are the same for Path A and Path B.
+
+% --- Optional Advanced Notes (append at the end of chapters/02B_server_windows_wsl2_docker.tex) ---
+
+\section{Optional advanced notes (read only if you need them)}
+This section is intentionally optional. If your Docker + WSL2 setup works, you can skip it.
+
+\subsection{A) Do I need Docker Desktop? (alternatives)}
+For most beginners, \textbf{Docker Desktop is the simplest path} on Windows.
+However, there are alternatives:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Docker Engine inside WSL2 (without Docker Desktop).}
+  This can work, but it requires extra configuration (often systemd support, networking details, and careful permissions).
+  \item \textbf{A dedicated Linux machine or Linux VM.}
+  This often ends up simpler than fighting Windows-specific quirks if you want a permanent server.
+\end{itemize}
+
+\textbf{Recommendation:} Start with Docker Desktop. If you later decide you want a cleaner long-term server,
+move to Path A (Linux) using the same Compose files and the same data-layout principles.
+
+\subsection{B) About \texttt{systemctl} and systemd inside WSL2}
+On a classic Linux server, services are managed by \texttt{systemd} and the command \texttt{systemctl}.
+On WSL2, systemd support depends on your Windows/WSL configuration.
+
+If you run:
+\begin{lstlisting}
+systemctl status docker
+\end{lstlisting}
+and it fails, that does \textbf{not} automatically mean Docker is broken.
+In the Docker Desktop workflow, Docker is managed by Docker Desktop on Windows, not by systemd inside WSL.
+
+\textbf{What to do instead:}
+\begin{itemize}[leftmargin=*]
+  \item open Docker Desktop and confirm it is running,
+  \item in Ubuntu, run \texttt{docker ps} to see whether Docker responds.
+\end{itemize}
+
+\subsection{C) Where should I store data on Windows + WSL2?}
+You can store files in:
+\begin{itemize}[leftmargin=*]
+  \item the Linux filesystem (inside WSL): e.g., \texttt{/srv/...}
+  \item Windows drives mounted into WSL: e.g., \texttt{/mnt/c/...}, \texttt{/mnt/d/...}
+\end{itemize}
+
+\textbf{Practical rule:}
+\begin{itemize}[leftmargin=*]
+  \item For Docker volumes, databases, and indexes: prefer the Linux filesystem (\texttt{/srv}) for performance and fewer permission issues.
+  \item For large media archives you already have on Windows disks: you can mount/read them from \texttt{/mnt/d/...}, but test performance.
+\end{itemize}
+
+\subsection{D) Accessing your services from another device}
+In most Docker Desktop setups, when you publish a port (e.g., \texttt{8080:8080}),
+Windows exposes that port on your local network interface.
+
+\textbf{Typical workflow:}
+\begin{itemize}[leftmargin=*]
+  \item First test locally: open your browser on the same PC and use \texttt{http://localhost:PORT}.
+  \item Then test from another device on the same network: use \texttt{http://WINDOWS\_IP:PORT}.
+\end{itemize}
+
+If it does not work from another device:
+\begin{itemize}[leftmargin=*]
+  \item check the Windows firewall rules,
+  \item ensure Docker Desktop is running,
+  \item verify the container really publishes the port (\texttt{docker ps} shows port mappings).
+\end{itemize}
+
+\subsection{E) WSL2 resource limits (CPU/RAM/disk)}
+WSL2 uses Windows resources. On some systems, you may want to limit its maximum RAM/CPU usage,
+especially if your laptop becomes slow.
+
+This can be configured via a \texttt{.wslconfig} file in your Windows user home directory.
+If you do not have performance problems, ignore this.
+If you do, this is a good first tuning knob.
+
+\subsection{F) Backups on Windows + WSL2 (simple advice)}
+Even in a beginner setup, plan backups early:
+\begin{itemize}[leftmargin=*]
+  \item keep your persistent folders under a single root (we use \texttt{/srv}),
+  \item periodically copy that folder to an external drive or another machine.
+\end{itemize}
+
+\textbf{Important:} if you store your Docker data in the Linux filesystem inside WSL,
+make sure your backup method can access it reliably (e.g., exporting/copying from inside the Ubuntu terminal). 

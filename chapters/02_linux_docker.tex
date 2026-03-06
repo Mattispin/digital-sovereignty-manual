@@ -1,0 +1,407 @@
+% chapters/02_linux_docker.tex
+\chapter{Linux and Docker: the foundation of the stack}
+\label{ch:linux_docker}
+
+\section{Goal (what you will achieve)}
+This chapter builds the foundation for everything else.
+
+By the end, you will have:
+\begin{itemize}[leftmargin=*]
+  \item a Linux environment ready to run services continuously,
+  \item Docker installed and working,
+  \item Docker Compose available for multi-container applications,
+  \item a clean folder layout for persistent data (so upgrades do not destroy your files),
+  \item a simple way to verify your system is healthy before installing the applications.
+\end{itemize}
+
+\section{Before we start: two valid ways to get Linux}
+When beginners hear ``install Docker on Linux'', a common confusion is:
+\emph{``But I am on Windows---where is this Linux terminal you keep mentioning?''}
+
+You need \textbf{some Linux environment} before you can run the Linux commands in this manual.
+You can get that in two common ways:
+
+\subsection{Path A (recommended): install Linux directly on the machine}
+This is the most reliable approach for a real server:
+\begin{itemize}[leftmargin=*]
+  \item your machine boots into Linux,
+  \item you open the Linux terminal directly,
+  \item services run in the background like a proper server.
+\end{itemize}
+
+\subsection{Path B (beginner-friendly on Windows): use WSL2}
+WSL2 (Windows Subsystem for Linux) lets you run a real Linux distribution inside Windows.
+You will open a Linux terminal \emph{from Windows}, but the commands still run \emph{inside Linux}.
+
+This is a good way to learn and to prototype, but for a long-term always-on server,
+a full Linux install is usually simpler.
+
+\section{Important concept: what is a ``terminal'' and what is \texttt{sudo}?}
+A \textbf{terminal} is a text-based interface to the operating system. You type commands, the system executes them.
+
+\texttt{sudo} means ``run as administrator'' \emph{inside Linux}.
+\begin{itemize}[leftmargin=*]
+  \item On Linux, many system changes (installing software, editing protected files) require administrator privileges.
+  \item \texttt{sudo} temporarily grants those privileges when you trust the command.
+  \item On Windows, \texttt{sudo} is not a standard command (unless you are in a Linux environment such as WSL).
+\end{itemize}
+
+So if you ever wonder ``why does sudo work on my Windows PC?'', the answer is:
+\textbf{because you are actually inside Linux (WSL), not executing Windows commands.}
+
+\section{Step 1 --- Get a Linux terminal (choose A or B)}
+\subsection{Step 1A: Linux installed directly (Ubuntu Server / Debian)}
+At the end of the Linux installation you can:
+\begin{itemize}[leftmargin=*]
+  \item log in on the machine itself (keyboard + screen), or
+  \item log in remotely using SSH (recommended).
+\end{itemize}
+
+If you are on the machine: you will see a login prompt. After login, you are already in a terminal.
+
+If you are connecting remotely (SSH): from another computer you use an SSH client.
+On Windows, you can open \textbf{PowerShell} and type:
+\begin{lstlisting}
+ssh username@SERVER_IP
+\end{lstlisting}
+After logging in, you are inside the Linux terminal of the server.
+
+\subsection{Step 1B: Windows + WSL2 (Ubuntu inside Windows)}
+If you want the beginner path on Windows, do this:
+\begin{itemize}[leftmargin=*]
+  \item Install WSL2 and an Ubuntu distribution.
+  \item Open the Ubuntu app (this is your Linux terminal).
+  \item Run all Linux commands from that Ubuntu window.
+\end{itemize}
+
+In practice, once WSL2 is installed, you open \textbf{Ubuntu} from the Start menu.
+That window is the Linux terminal.
+
+\paragraph{Note.}
+This manual does not assume you already know WSL2. If you choose this path,
+you can treat WSL2 as ``a Linux box living inside Windows''.
+
+\section{Step 1 (continued) --- Update Linux}
+Once you have \emph{a Linux terminal open} (either on a Linux machine, via SSH, or via WSL),
+run the following commands.
+
+\subsection{1.1 Update package lists}
+\begin{lstlisting}
+sudo apt update
+\end{lstlisting}
+\textbf{What this does:} downloads the latest list of available software packages from your configured repositories. \\
+\textbf{Why you do it:} ensures you install up-to-date packages and security fixes.
+
+\subsection{1.2 Upgrade installed packages}
+\begin{lstlisting}
+sudo apt upgrade -y
+\end{lstlisting}
+\textbf{What this does:} upgrades installed packages to newer versions. \\
+\textbf{Why you do it:} reduces bugs and security issues before you install Docker. \\
+\textbf{About \texttt{-y}:} automatically answers ``yes'' to prompts (useful in step-by-step guides).
+
+\subsection{1.3 Install basic tools we will use later (recommended)}
+\begin{lstlisting}
+sudo apt install -y curl ca-certificates gnupg lsb-release unzip
+\end{lstlisting}
+\textbf{What these are:}
+\begin{itemize}[leftmargin=*]
+  \item \texttt{curl}: downloads data from the internet (we use it to fetch Docker keys and scripts),
+  \item \texttt{ca-certificates}: ensures HTTPS downloads are verified correctly,
+  \item \texttt{gnupg}: used to verify signed packages (security),
+  \item \texttt{lsb-release}: helps detect your Linux version codename automatically,
+  \item \texttt{unzip}: needed sometimes for downloaded archives.
+\end{itemize}
+
+\subsection{Quick sanity check: do you have \texttt{sudo} access?}
+Try:
+\begin{lstlisting}
+sudo whoami
+\end{lstlisting}
+If it prints \texttt{root}, your user can run admin commands (good).
+If it fails, your user is not allowed to use \texttt{sudo} and you must fix that first
+(typically by using the admin account created during Linux installation).
+
+\section{Step 2 --- Create a clean data layout}
+A common beginner mistake is to store important data \emph{inside} containers.
+Do \textbf{not} do that.
+
+\subsection*{The idea (in one sentence)}
+Containers are meant to be disposable; your data should live in \emph{normal folders on disk} that you control.
+
+\subsection*{Choose a single root folder for persistent data}
+Instead of scattering files across the system, choose one directory that will hold:
+\begin{itemize}[leftmargin=*]
+  \item your application configuration (Compose files),
+  \item your databases and indexes,
+  \item your photo/music libraries,
+  \item backups.
+\end{itemize}
+
+Two common options are:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{/srv} (very common on servers),
+  \item \texttt{/opt} (also used for application data).
+\end{itemize}
+
+In this manual we will use \texttt{/srv}.
+
+\subsection*{Create the folders}
+\begin{lstlisting}
+sudo mkdir -p /srv/{docker,photos,music,drive,ai,backups}
+sudo mkdir -p /srv/docker/compose
+\end{lstlisting}
+
+\textbf{What this does:}
+\begin{itemize}[leftmargin=*]
+  \item \texttt{mkdir} creates directories,
+  \item \texttt{-p} means ``create parent folders if needed and do not complain if the folder already exists'',
+  \item the \texttt{\{...\}} syntax is a shortcut to create multiple folders in one command.
+\end{itemize}
+
+\textbf{Why you do it:} you get a predictable, documented structure that makes your stack easier to maintain and back up.
+
+\subsection*{Give your user ownership}
+\begin{lstlisting}
+sudo chown -R $USER:$USER /srv
+\end{lstlisting}
+
+\textbf{What this does:}
+\begin{itemize}[leftmargin=*]
+  \item \texttt{chown} changes ownership of files/folders,
+  \item \texttt{-R} means ``recursive'' (apply to everything inside),
+  \item \texttt{\$USER} expands to your current username.
+\end{itemize}
+
+\textbf{Why you do it:} so you can edit configuration and manage volumes without constantly using \texttt{sudo}.
+
+\subsection{Why this matters}
+When you upgrade or recreate containers, your data remains safe in \texttt{/srv}.
+Containers can be disposable; your files should not be.
+
+\section{Step 3 --- Install Docker Engine}
+The safest approach is to install Docker from Docker's official repository.
+This matters because:
+\begin{itemize}[leftmargin=*]
+  \item you get security updates and bug fixes,
+  \item you avoid outdated versions from generic repositories,
+  \item you can reproduce the same setup on another machine.
+\end{itemize}
+
+\subsection{3.1 Add Docker's official GPG key}
+\begin{lstlisting}
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+\end{lstlisting}
+
+\textbf{What this does (line by line):}
+\begin{itemize}[leftmargin=*]
+  \item \texttt{install -d ...} creates a system folder for trusted repository keys,
+  \item \texttt{curl ... | gpg --dearmor ...} downloads Docker's signing key and stores it in a format APT can use,
+  \item \texttt{chmod a+r ...} makes the key readable by the package manager.
+\end{itemize}
+
+\textbf{Why you do it:} APT uses this key to verify that Docker packages are authentic (not tampered with).
+
+\subsection{3.2 Add the Docker repository}
+\textbf{Important: choose the correct block for your distribution.}
+
+\subsubsection*{Ubuntu}
+\begin{lstlisting}
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+\end{lstlisting}
+
+\subsubsection*{Debian}
+\begin{lstlisting}
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+\end{lstlisting}
+
+\textbf{What this does:}
+\begin{itemize}[leftmargin=*]
+  \item writes a new ``software source'' file for APT,
+  \item automatically detects your CPU architecture (e.g., amd64),
+  \item automatically detects your distro codename (e.g., \texttt{jammy}, \texttt{bookworm}),
+  \item tells APT to trust packages signed by the Docker key you installed.
+\end{itemize}
+
+\textbf{Why you do it:} so \texttt{apt} can download Docker directly from the official source.
+
+\subsection{3.3 Install Docker Engine and plugins}
+\begin{lstlisting}
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+\end{lstlisting}
+
+\textbf{What this does:}
+\begin{itemize}[leftmargin=*]
+  \item \texttt{apt update} refreshes package lists (now including Docker's repo),
+  \item installs Docker Engine (\texttt{docker-ce}) and its command-line interface (\texttt{docker-ce-cli}),
+  \item installs \texttt{containerd} (the container runtime Docker uses under the hood),
+  \item installs Buildx (modern build features),
+  \item installs the Compose plugin (so you can use \texttt{docker compose ...}).
+\end{itemize}
+
+\textbf{Why you do it:} this gives you a modern Docker + Compose setup that matches current documentation.
+
+\subsection{3.4 Enable and start Docker}
+\begin{lstlisting}
+sudo systemctl enable docker
+sudo systemctl start docker
+\end{lstlisting}
+
+\textbf{What this does:}
+\begin{itemize}[leftmargin=*]
+  \item \texttt{enable} makes Docker start automatically at boot,
+  \item \texttt{start} starts Docker right now.
+\end{itemize}
+
+\textbf{Why you do it:} your services should survive reboots.
+
+\paragraph{WSL note.}
+If you are on WSL2, \texttt{systemctl} may not work depending on your setup.
+In that case, Docker is typically used via Docker Desktop on Windows, or via a WSL configuration that supports systemd.
+
+\section{Step 4 --- Allow running Docker without sudo (recommended)}
+By default, Docker requires \texttt{sudo}. For day-to-day use, add your user to the \texttt{docker} group:
+
+\begin{lstlisting}
+sudo usermod -aG docker $USER
+\end{lstlisting}
+
+\textbf{What this does:}
+\begin{itemize}[leftmargin=*]
+  \item adds your user to the \texttt{docker} group,
+  \item users in that group can talk to the Docker daemon without \texttt{sudo}.
+\end{itemize}
+
+\textbf{Why you do it:} it makes everyday commands less annoying.
+
+Then log out and log back in (or reboot) so the group membership applies.
+
+\section{Step 5 --- Verify the installation}
+\subsection{Docker version}
+\begin{lstlisting}
+docker --version
+\end{lstlisting}
+\textbf{What this does:} prints the installed Docker version. \\
+\textbf{Why you do it:} confirms the command is available.
+
+\subsection{Compose version}
+\begin{lstlisting}
+docker compose version
+\end{lstlisting}
+\textbf{What this does:} prints the Compose plugin version. \\
+\textbf{Why you do it:} confirms you can run multi-service stacks.
+
+\subsection{Hello-world test}
+\begin{lstlisting}
+docker run --rm hello-world
+\end{lstlisting}
+\textbf{What this does:}
+\begin{itemize}[leftmargin=*]
+  \item downloads a tiny test image (if needed),
+  \item runs it in a container,
+  \item \texttt{--rm} deletes the container after it exits (keeps things clean).
+\end{itemize}
+
+\textbf{Why you do it:} it proves the full chain works: download images + run containers.
+
+\section{Step 6 --- (Optional) Basic firewall and SSH hygiene}
+If you are only using the services inside your home network or behind a VPN, you can keep things simple.
+If your machine is exposed to the internet, do \textbf{not} skip this.
+
+\subsection{Enable UFW (simple firewall)}
+\begin{lstlisting}
+sudo apt install -y ufw
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow OpenSSH
+sudo ufw enable
+sudo ufw status
+\end{lstlisting}
+
+\textbf{What this does:}
+\begin{itemize}[leftmargin=*]
+  \item installs UFW (Uncomplicated Firewall),
+  \item blocks all incoming traffic by default (safer),
+  \item allows outgoing traffic (normal),
+  \item allows SSH so you do not lock yourself out,
+  \item enables the firewall and shows its status.
+\end{itemize}
+
+\textbf{Why you do it:} it reduces the attack surface of your server.
+
+\subsection{SSH: disable password login (recommended)}
+Once you can log in via SSH keys, disable password login by editing the SSH configuration file.
+
+\begin{lstlisting}
+sudo nano /etc/ssh/sshd_config
+\end{lstlisting}
+
+\textbf{What this does:} opens the SSH server configuration in a text editor. \\
+\textbf{Why you do it:} to prevent password brute-force attacks.
+
+Find the line (or add it) and set:
+
+\begin{lstlisting}
+PasswordAuthentication no
+\end{lstlisting}
+
+Then restart SSH:
+
+\begin{lstlisting}
+sudo systemctl restart ssh
+\end{lstlisting}
+
+\textbf{What this does:} restarts the SSH service so changes take effect. \\
+\textbf{Why you do it:} config changes do nothing until the service reloads/restarts.
+
+\section{Verification checklist}
+Before moving on, confirm:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{docker run --rm hello-world} works,
+  \item \texttt{docker compose version} prints a version,
+  \item you have a persistent folder structure under \texttt{/srv},
+  \item you understand the core idea: containers are disposable; data is not.
+\end{itemize}
+
+\section{Troubleshooting (common issues)}
+\subsection{``Permission denied'' when running Docker}
+If you see permission errors without \texttt{sudo}, either:
+\begin{itemize}[leftmargin=*]
+  \item you did not add your user to the \texttt{docker} group, or
+  \item you did, but you did not log out/in (group not applied yet).
+\end{itemize}
+
+Fix:
+\begin{lstlisting}
+sudo usermod -aG docker $USER
+\end{lstlisting}
+Then log out and log back in.
+
+\subsection{Docker service not running}
+Check status:
+\begin{lstlisting}
+sudo systemctl status docker
+\end{lstlisting}
+Start it:
+\begin{lstlisting}
+sudo systemctl start docker
+\end{lstlisting}
+
+\subsection{Compose not found}
+Make sure you installed the Compose plugin:
+\begin{lstlisting}
+sudo apt install -y docker-compose-plugin
+\end{lstlisting}
+
+\subsection{Next step}
+In the next chapter we will deploy PhotoPrism using Docker Compose, reusing the same principles:
+\textbf{clear volumes}, \textbf{documented configuration}, and \textbf{easy upgrades}.

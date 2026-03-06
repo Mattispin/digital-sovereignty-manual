@@ -1,0 +1,430 @@
+% chapters/09_seafile_drive.tex
+\chapter{Private Drive (Option B): Seafile}
+\label{ch:seafile}
+
+\begin{center}
+  \vspace{0.6cm}
+  \includegraphics[width=0.38\textwidth]{servidor_seafile}
+  \vspace{0.8cm}
+\end{center}
+
+
+\section{Goal (what you will achieve)}
+In this chapter you will deploy Seafile as a fast, reliable private ``Drive'' focused on file syncing and libraries.
+Optionally, you can add OnlyOffice so documents can be edited in the browser.
+
+By the end, you will have:
+\begin{itemize}[leftmargin=*]
+  \item a working Seafile instance reachable on your local network (or VPN),
+  \item persistent storage under \texttt{/srv} (so upgrades do not delete your data),
+  \item a clear understanding of the ``web address'' concept (what users type in their browser),
+  \item \textbf{optional}: OnlyOffice document editing for Seafile.
+\end{itemize}
+
+\encourage{If your main goal is ``files and sync, without a huge ecosystem'', Seafile is often the calm, efficient choice.}
+
+\section{What is Seafile (plain language)}
+Seafile is a self-hosted file sync and sharing platform. Its core idea is \textbf{libraries}:
+you organize content into libraries, sync them to devices, and share them with others.
+It tends to feel lighter and faster than full-suite platforms when your focus is file syncing.
+
+\section{Read this first: what to skip if you do not want online editing}
+This chapter is split into:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Core Drive (recommended baseline):} install Seafile and sync files.
+  \item \textbf{Optional Office:} add OnlyOffice for browser-based document editing.
+\end{itemize}
+
+If you do \textbf{not} want online editing, follow Sections~\ref{sec:sf_web_address}--\ref{sec:sf_core_verify} and skip Section~\ref{sec:sf_onlyoffice}.
+
+\section{Prerequisites}
+\begin{itemize}[leftmargin=*]
+  \item Docker and Docker Compose working (Chapter 2 or 3).
+  \item Local access (LAN/Wi-Fi). Optional: VPN for remote access (Appendix~\ref{app:vpn}).
+  \item A persistent data root (we use \texttt{/srv}).
+\end{itemize}
+
+\section{The ``web address'' Seafile needs}
+\label{sec:sf_web_address}
+Seafile needs to know how users will reach it in the browser. This affects link generation and some integrations.
+
+\subsection*{What should you put there?}
+Use the address you will actually type:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{On your home LAN/Wi-Fi:} \texttt{http://SERVER\_IP:8000}
+  \item \textbf{On VPN:} the same address you use on LAN, or a VPN IP/name
+  \item \textbf{Public internet (advanced):} \texttt{https://drive.yourdomain.com} (only after reverse proxy + TLS)
+\end{itemize}
+
+\encourage{Start with LAN/VPN first. If you later add a domain + HTTPS, you can update the URL settings.}
+
+\section{Folder layout}
+We keep Seafile predictable:
+
+\begin{itemize}[leftmargin=*]
+  \item \texttt{/srv/docker/compose/seafile} --- Compose files
+  \item \texttt{/srv/drive/seafile} --- Seafile persistent data (libraries, config)
+  \item \texttt{/srv/drive/seafile-db} --- database data
+\end{itemize}
+
+Create folders:
+
+\begin{lstlisting}
+mkdir -p /srv/docker/compose/seafile
+mkdir -p /srv/drive/{seafile,seafile-db}
+\end{lstlisting}
+
+\section{Core Drive install}
+\subsection{Step 1 --- Create the Compose project}
+Go to the folder:
+
+\begin{lstlisting}
+cd /srv/docker/compose/seafile
+\end{lstlisting}
+
+\subsection{Step 2 --- Create \texttt{.env} (recommended)}
+Create:
+
+\begin{lstlisting}
+nano .env
+\end{lstlisting}
+
+Paste and edit:
+
+\begin{lstlisting}
+# --- Seafile web address (what users type) ---
+SEAFILE_SERVER_HOSTNAME=SERVER_IP
+
+# --- Admin account ---
+SEAFILE_ADMIN_EMAIL=admin@example.com
+SEAFILE_ADMIN_PASSWORD=CHANGE_THIS_TO_A_LONG_PASSWORD
+
+# --- Database (MariaDB) ---
+MYSQL_ROOT_PASSWORD=CHANGE_THIS_ROOT_PASSWORD
+MYSQL_LOG_CONSOLE=true
+
+# Timezone (optional)
+TZ=Europe/Madrid
+\end{lstlisting}
+
+\textbf{Why this matters:}
+\begin{itemize}[leftmargin=*]
+  \item Seafile needs an admin account on first start.
+  \item Seafile uses a database for metadata.
+  \item Keeping secrets in \texttt{.env} is cleaner than hardcoding them in YAML.
+\end{itemize}
+
+\encourage{Yes, real passwords. Drives tend to grow into “critical infrastructure” faster than you expect.}
+
+\subsection{Step 3 --- Create \texttt{docker-compose.yml}}
+Create:
+
+\begin{lstlisting}
+nano docker-compose.yml
+\end{lstlisting}
+
+Paste (core Seafile + MariaDB):
+
+\begin{lstlisting}
+services:
+  db:
+    image: mariadb:11
+    container_name: seafile-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_LOG_CONSOLE: ${MYSQL_LOG_CONSOLE}
+      TZ: ${TZ}
+    volumes:
+      - /srv/drive/seafile-db:/var/lib/mysql
+
+  memcached:
+    image: memcached:1.6-alpine
+    container_name: seafile-memcached
+    restart: unless-stopped
+
+  seafile:
+    image: seafileltd/seafile-mc:latest
+    container_name: seafile
+    restart: unless-stopped
+    depends_on:
+      - db
+      - memcached
+    ports:
+      - "8000:80"
+    environment:
+      DB_HOST: db
+      DB_ROOT_PASSWD: ${MYSQL_ROOT_PASSWORD}
+      TIME_ZONE: ${TZ}
+
+      SEAFILE_ADMIN_EMAIL: ${SEAFILE_ADMIN_EMAIL}
+      SEAFILE_ADMIN_PASSWORD: ${SEAFILE_ADMIN_PASSWORD}
+
+      # The hostname (or domain) users will use:
+      SEAFILE_SERVER_HOSTNAME: ${SEAFILE_SERVER_HOSTNAME}
+    volumes:
+      - /srv/drive/seafile:/shared
+\end{lstlisting}
+
+\textbf{What this gives you:}
+\begin{itemize}[leftmargin=*]
+  \item Seafile web UI exposed on port 8000.
+  \item MariaDB for metadata.
+  \item Memcached for performance (recommended).
+  \item All persistent data under \texttt{/srv/drive/...}.
+\end{itemize}
+
+\encourage{If YAML feels fragile: it is. Indentation matters. If something fails, it is usually one missing space, not a life problem.}
+
+\subsection{Step 4 --- Start Seafile}
+Start:
+
+\begin{lstlisting}
+docker compose up -d
+\end{lstlisting}
+
+Check:
+
+\begin{lstlisting}
+docker ps
+\end{lstlisting}
+
+Logs (first debugging tool):
+
+\begin{lstlisting}
+docker compose logs -f --tail=120
+\end{lstlisting}
+
+\subsection{Step 5 --- Open Seafile (first login)}
+On the same machine:
+
+\begin{lstlisting}
+http://localhost:8000
+\end{lstlisting}
+
+From another device on the same network:
+
+\begin{lstlisting}
+http://SERVER_IP:8000
+\end{lstlisting}
+
+Log in with the admin email/password from \texttt{.env}.
+
+\encourage{If the login page loads: you are already winning. Most ``server projects'' fail before this moment.}
+
+\section{Verification checklist (core)}
+\label{sec:sf_core_verify}
+You are done with the core when:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{docker ps} shows \texttt{seafile}, \texttt{seafile-db}, and \texttt{seafile-memcached} running,
+  \item \texttt{http://localhost:8000} loads,
+  \item you can create a library and upload/download a file,
+  \item a share link works from another device on the same network.
+\end{itemize}
+
+\section{Access from mobile and tablet}
+\subsection*{On the same Wi-Fi (local network)}
+Open:
+
+\begin{lstlisting}
+http://SERVER_IP:8000
+\end{lstlisting}
+
+\subsection*{Outside your home (recommended: VPN)}
+Connect your device to VPN (Appendix~\ref{app:vpn}), then use the same address.
+
+\subsection*{Make it feel like an app}
+You can add the Seafile page to your home screen (``Add to Home Screen'').
+
+\section{Common pitfalls (core)}
+\subsection{1) Seafile starts, but the web UI is not reachable}
+Check:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{docker ps} (is the container running?)
+  \item published ports (do you see \texttt{0.0.0.0:8000->80/tcp}?)
+  \item logs:
+\end{itemize}
+
+\begin{lstlisting}
+docker compose logs -f --tail=120
+\end{lstlisting}
+
+\subsection{2) Wrong hostname / bad links}
+If share links point to the wrong place, update \texttt{SEAFILE\_SERVER\_HOSTNAME} in \texttt{.env}
+and restart:
+
+\begin{lstlisting}
+docker compose down
+docker compose up -d
+\end{lstlisting}
+
+\subsection{3) Works on localhost but not from phone}
+Most common cause: firewall (especially on Windows in Path B).
+If you need access outside home, use VPN (Appendix~\ref{app:vpn}).
+
+\subsection{4) Database container problems}
+If Seafile complains about the database:
+\begin{itemize}[leftmargin=*]
+  \item confirm the DB container is running,
+  \item ensure the root password matches (\texttt{MYSQL\_ROOT\_PASSWORD} vs \texttt{DB\_ROOT\_PASSWD}).
+\end{itemize}
+
+% ===========================
+% OPTIONAL SECTION: ONLYOFFICE
+% ===========================
+\section{Optional: OnlyOffice integration (skip if you do not want online editing)}
+\label{sec:sf_onlyoffice}
+OnlyOffice adds browser-based editing of office documents alongside your Drive.
+
+The typical approach is:
+\begin{itemize}[leftmargin=*]
+  \item run OnlyOffice Docs (Document Server) as a separate container,
+  \item configure Seafile to use it (usually with a shared secret / JWT),
+  \item verify by opening a document from the Seafile UI.
+\end{itemize}
+
+\encourage{Optional means optional. Your Drive works perfectly without this. Add it only if you actually want browser editing.}
+
+\subsection{Step O1 --- Add OnlyOffice Docs to the Compose file}
+Edit \texttt{docker-compose.yml} and add this service:
+
+\begin{lstlisting}
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: seafile-onlyoffice
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      JWT_ENABLED: "true"
+      JWT_SECRET: "CHANGE_THIS_TO_A_LONG_RANDOM_SECRET"
+    ports:
+      - "8001:80"
+\end{lstlisting}
+
+Restart:
+
+\begin{lstlisting}
+docker compose down
+docker compose up -d
+\end{lstlisting}
+
+\subsection{Step O2 --- Tell Seafile where OnlyOffice lives}
+Seafile needs to know the OnlyOffice Document Server address and the shared secret.
+
+In many Seafile setups, this is configured in Seafile's config files under:
+\begin{lstlisting}
+/srv/drive/seafile/conf/
+\end{lstlisting}
+
+You will typically set:
+\begin{itemize}[leftmargin=*]
+  \item the OnlyOffice URL (for Seafile-to-OnlyOffice communication),
+  \item the JWT secret (must match the container).
+\end{itemize}
+
+\encourage{Integration settings vary slightly between Seafile versions and deployment styles. The good news: once you know where the config lives (\texttt{/srv/drive/seafile/conf/}), you are in control.}
+
+\subsubsection*{Step O2a --- Locate the Seafile config file}
+The Seafile configuration folder is mounted on the host at:
+\begin{lstlisting}
+/srv/drive/seafile/conf/
+\end{lstlisting}
+
+The file we want is usually:
+\begin{lstlisting}
+/srv/drive/seafile/conf/seahub_settings.py
+\end{lstlisting}
+
+\subsubsection*{Step O2b --- Edit \texttt{seahub\_settings.py}}
+Open it:
+\begin{lstlisting}
+nano /srv/drive/seafile/conf/seahub_settings.py
+\end{lstlisting}
+
+Add (or update) the OnlyOffice settings below.
+
+\textbf{Important rules:}
+\begin{itemize}[leftmargin=*]
+  \item \texttt{JWT\_SECRET} must match the one used by the OnlyOffice container.
+  \item Use the \textbf{internal Docker name} \texttt{onlyoffice} for container-to-container communication.
+\end{itemize}
+
+\begin{lstlisting}[language=Python]
+# --- OnlyOffice integration (example) ---
+ENABLE_ONLYOFFICE = True
+
+ONLYOFFICE_APIJS_URL = "http://onlyoffice/web-apps/apps/api/documents/api.js"
+ONLYOFFICE_FILE_EXTENSION = (
+  ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx",
+  ".odt", ".odp", ".ods"
+)
+
+# JWT shared secret (must match the OnlyOffice container)
+ONLYOFFICE_JWT_SECRET = "CHANGE_THIS_TO_THE_SAME_JWT_SECRET"
+\end{lstlisting}
+
+\subsubsection*{Step O2c --- Restart Seafile to apply changes}
+From your Seafile Compose folder:
+\begin{lstlisting}
+cd /srv/docker/compose/seafile
+docker compose restart seafile
+\end{lstlisting}
+
+Then refresh Seafile in the browser and try opening a \texttt{.docx}.
+
+\subsection{Verification (OnlyOffice)}
+You are done when:
+\begin{itemize}[leftmargin=*]
+  \item OnlyOffice is reachable on \texttt{http://SERVER\_IP:8001/},
+  \item Seafile can open a document in the browser editor,
+  \item saving works without errors.
+\end{itemize}
+
+\subsection{Common pitfalls (OnlyOffice)}
+\subsubsection*{Connection errors}
+Most common causes:
+\begin{itemize}[leftmargin=*]
+  \item wrong OnlyOffice URL (internal vs external),
+  \item secret mismatch (JWT),
+  \item HTTP/HTTPS mismatch (if you later add TLS).
+\end{itemize}
+
+\subsubsection*{Public exposure}
+Do not expose OnlyOffice publicly until you understand reverse proxies and TLS.
+Keep it LAN/VPN by default.
+
+\section{Next step}
+At this point you have two documented Drive options:
+\begin{itemize}[leftmargin=*]
+  \item Nextcloud (more ``suite'' features),
+  \item Seafile (fast, focused sync/libraries).
+\end{itemize}
+
+\section{Decision summary: Nextcloud vs Seafile (which one should you keep?)}
+Both options are valid. The best choice depends on what you want your ``Drive'' to be.
+
+\subsection*{Choose Nextcloud if you want a platform}
+Nextcloud is a good fit if you want a broader ecosystem:
+\begin{itemize}[leftmargin=*]
+  \item lots of built-in sharing features and an ``app'' mindset,
+  \item future expansion into calendars, contacts, collaborative apps,
+  \item a familiar ``cloud suite'' feeling.
+\end{itemize}
+
+\subsection*{Choose Seafile if you want fast, focused syncing}
+Seafile is a good fit if your priority is file libraries and efficient sync:
+\begin{itemize}[leftmargin=*]
+  \item a lighter, often faster experience for file syncing,
+  \item a simpler mental model (libraries + clients),
+  \item fewer moving parts if you do not need the full suite.
+\end{itemize}
+
+\subsection*{And about OnlyOffice}
+OnlyOffice is optional in both.
+Add it only if you genuinely want browser-based document editing.
+Otherwise, keep your setup simpler and edit documents with your local apps.
+
+\encourage{There is no ``wrong'' choice here. Pick the one that matches your workflow today. You can always migrate later because your data lives under \texttt{/srv} and your stack is documented.}
+
+
+Next, we will describe backups and a simple maintenance routine (updates, logs, and safety checks). 

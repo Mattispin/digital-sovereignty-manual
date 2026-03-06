@@ -1,0 +1,417 @@
+% chapters/08_nextcloud_drive.tex
+\chapter{Private Drive (Option A): Nextcloud}
+\label{ch:nextcloud}
+
+\begin{center}
+  \vspace{0.6cm}
+  \includegraphics[width=0.38\textwidth]{servidor_nextcloud}
+  \vspace{0.8cm}
+\end{center}
+
+
+
+\section{Goal (what you will achieve)}
+In this chapter you will deploy Nextcloud as your private ``Drive'': file sync, sharing links, and a web interface for your files.
+Optionally, you can add OnlyOffice to edit documents directly in the browser.
+
+By the end, you will have:
+\begin{itemize}[leftmargin=*]
+  \item a working Nextcloud instance reachable on your local network (or VPN),
+  \item persistent storage under \texttt{/srv} (so upgrades do not delete your data),
+  \item a clear understanding of the ``web address'' (URL) Nextcloud expects,
+  \item \textbf{optional}: OnlyOffice document editing inside Nextcloud.
+\end{itemize}
+
+\encourage{Nextcloud can look like a big ecosystem, but the core is simple: one web app + one database + your storage. We will build it step by step.}
+
+\section{What is Nextcloud (plain language)}
+Nextcloud is a self-hosted file platform. You can:
+\begin{itemize}[leftmargin=*]
+  \item upload and organize files in the browser,
+  \item sync files with desktop/mobile clients,
+  \item share folders and links,
+  \item optionally add apps (calendar, contacts, office editing, etc.).
+\end{itemize}
+
+It runs well in Docker, and the official Docker image supports basic auto-configuration and trusted domains. :contentReference[oaicite:0]{index=0}
+
+\section{Read this first: what to skip if you do not want online editing}
+This chapter is split into:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Core Drive (recommended baseline):} install Nextcloud and sync files.
+  \item \textbf{Optional Office:} add OnlyOffice for browser-based document editing.
+\end{itemize}
+
+If you do \textbf{not} want online editing, follow Sections~\ref{sec:nc_web_address}--\ref{sec:nc_core_verify} and skip Section~\ref{sec:nc_onlyoffice}.
+
+\section{Prerequisites}
+\begin{itemize}[leftmargin=*]
+  \item Docker and Docker Compose working (Chapter 2 or 3).
+  \item A persistent data root (we use \texttt{/srv}).
+  \item Local access (LAN/Wi-Fi). Optional: VPN for remote access (Appendix~\ref{app:vpn}).
+\end{itemize}
+
+\section{The ``web address'' Nextcloud asks for}
+\label{sec:nc_web_address}
+At some point, Nextcloud will ask for (or assume) a \textbf{web address} (URL).
+This is not ``external IP''. It simply means: \emph{what address will you type in the browser to reach Nextcloud?}
+
+This matters because Nextcloud uses it for link generation and security checks (trusted domains).
+
+\subsection*{What should you put there?}
+Use the address you will actually use most of the time:
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Local-only on the same machine:} \texttt{http://localhost:8080}
+  \item \textbf{On your home LAN/Wi-Fi:} \texttt{http://SERVER\_IP:8080}
+  \item \textbf{On VPN (recommended for travel):} the same address you use on LAN, or your VPN IP/name
+  \item \textbf{Public internet (advanced):} \texttt{https://cloud.yourdomain.com} (only after reverse proxy + TLS)
+\end{itemize}
+
+\encourage{Start LAN/VPN first. Public internet access is optional and comes later, once everything works locally.}
+
+\section{Folder layout}
+We keep Nextcloud predictable:
+
+\begin{itemize}[leftmargin=*]
+  \item \texttt{/srv/docker/compose/nextcloud} --- Compose files
+  \item \texttt{/srv/drive/nextcloud/html} --- Nextcloud application data (apps/config)
+  \item \texttt{/srv/drive/nextcloud/data} --- user files (the important part)
+  \item \texttt{/srv/drive/nextcloud/db} --- database data
+  \item \texttt{/srv/drive/nextcloud/redis} --- redis data (optional, but recommended)
+\end{itemize}
+
+Create folders:
+
+\begin{lstlisting}
+mkdir -p /srv/docker/compose/nextcloud
+mkdir -p /srv/drive/nextcloud/{html,data,db,redis}
+\end{lstlisting}
+
+\section{Core Drive install}
+\subsection{Step 1 --- Create the Compose project}
+\label{sec:nc_core_start}
+Go to the Nextcloud compose folder:
+
+\begin{lstlisting}
+cd /srv/docker/compose/nextcloud
+\end{lstlisting}
+
+\subsection{Step 2 --- Create \texttt{.env} (recommended)}
+Create:
+
+\begin{lstlisting}
+nano .env
+\end{lstlisting}
+
+Paste and edit:
+
+\begin{lstlisting}
+# --- Database (MariaDB) ---
+MYSQL_DATABASE=nextcloud
+MYSQL_USER=nextcloud
+MYSQL_PASSWORD=CHANGE_THIS_DB_PASSWORD
+MYSQL_ROOT_PASSWORD=CHANGE_THIS_ROOT_PASSWORD
+
+# --- Nextcloud admin ---
+NEXTCLOUD_ADMIN_USER=admin
+NEXTCLOUD_ADMIN_PASSWORD=CHANGE_THIS_TO_A_LONG_PASSWORD
+
+# --- The addresses you will use to access Nextcloud ---
+# Space-separated. Add at least one: localhost, your LAN IP, and/or a local hostname.
+NEXTCLOUD_TRUSTED_DOMAINS=localhost 127.0.0.1 SERVER_IP
+
+# Timezone (optional)
+TZ=Europe/Madrid
+\end{lstlisting}
+
+\textbf{Why this matters:}
+\begin{itemize}[leftmargin=*]
+  \item Nextcloud needs an admin user for first setup.
+  \item The database needs credentials.
+  \item Trusted domains avoid the ``untrusted domain'' warning and are supported by the official image. :contentReference[oaicite:1]{index=1}
+\end{itemize}
+
+\encourage{Yes, set real passwords. Nextcloud becomes your personal data hub. Treat it like one.}
+
+\subsection{Step 3 --- Create \texttt{docker-compose.yml}}
+Create:
+
+\begin{lstlisting}
+nano docker-compose.yml
+\end{lstlisting}
+
+Paste:
+
+\begin{lstlisting}
+services:
+  db:
+    image: mariadb:11
+    container_name: nextcloud-db
+    restart: unless-stopped
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: ${TZ}
+    volumes:
+      - /srv/drive/nextcloud/db:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    container_name: nextcloud-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - /srv/drive/nextcloud/redis:/data
+
+  app:
+    image: nextcloud:apache
+    container_name: nextcloud
+    restart: unless-stopped
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8080:80"
+    environment:
+      # Auto-config on first start:
+      MYSQL_HOST: db
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADMIN_USER}
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
+
+      # Trusted domains (space-separated):
+      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_TRUSTED_DOMAINS}
+
+      TZ: ${TZ}
+    volumes:
+      - /srv/drive/nextcloud/html:/var/www/html
+      - /srv/drive/nextcloud/data:/var/www/html/data
+
+  cron:
+    image: nextcloud:apache
+    container_name: nextcloud-cron
+    restart: unless-stopped
+    depends_on:
+      - app
+    entrypoint: /cron.sh
+    volumes:
+      - /srv/drive/nextcloud/html:/var/www/html
+      - /srv/drive/nextcloud/data:/var/www/html/data
+\end{lstlisting}
+
+\textbf{What this gives you:}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Nextcloud} web app on port 8080.
+  \item \textbf{MariaDB} database (recommended for real use).
+  \item \textbf{Redis} cache/locking (helps performance and file locking).
+  \item \textbf{Cron} container for background jobs (important for a healthy Nextcloud).
+\end{itemize}
+
+\encourage{YAML is sensitive to indentation. If Compose refuses to start, it is usually one missing space, not a disaster.}
+
+\subsection{Step 4 --- Start Nextcloud}
+Start:
+
+\begin{lstlisting}
+docker compose up -d
+\end{lstlisting}
+
+Check:
+
+\begin{lstlisting}
+docker ps
+\end{lstlisting}
+
+Logs (first debugging tool):
+
+\begin{lstlisting}
+docker compose logs -f --tail=120
+\end{lstlisting}
+
+\subsection{Step 5 --- Open Nextcloud (first login)}
+On the same machine:
+
+\begin{lstlisting}
+http://localhost:8080
+\end{lstlisting}
+
+From another device on the same network:
+
+\begin{lstlisting}
+http://SERVER_IP:8080
+\end{lstlisting}
+
+If auto-configuration works, you should land directly in the Nextcloud UI with your admin account.
+If you see an installer screen, follow it (database host is \texttt{db}).
+
+\encourage{If the page loads, you are already 80\% done. Most of the pain is before the first web page appears.}
+
+\section{Verification checklist (core)}
+\label{sec:nc_core_verify}
+You are done with the core when:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{docker ps} shows \texttt{nextcloud}, \texttt{nextcloud-db}, \texttt{nextcloud-redis}, and \texttt{nextcloud-cron} running,
+  \item \texttt{http://localhost:8080} loads,
+  \item you can upload a file and download it again,
+  \item Nextcloud does not complain about background jobs (cron).
+\end{itemize}
+
+\section{Access from mobile and tablet}
+\subsection*{On the same Wi-Fi (local network)}
+Open:
+
+\begin{lstlisting}
+http://SERVER_IP:8080
+\end{lstlisting}
+
+\subsection*{Outside your home (recommended: VPN)}
+Connect your device to VPN (Appendix~\ref{app:vpn}), then use the same address.
+This avoids exposing Nextcloud publicly.
+
+\subsection*{Make it feel like an app}
+You can add Nextcloud to your home screen from your browser (``Add to Home Screen'').
+
+\section{Common pitfalls (core)}
+\subsection{1) ``Accessing from an untrusted domain''}
+Add the address you are using to \texttt{NEXTCLOUD\_TRUSTED\_DOMAINS} in \texttt{.env} (space-separated),
+then restart:
+
+\begin{lstlisting}
+docker compose down
+docker compose up -d
+\end{lstlisting}
+
+Trusted domains are supported by the official image. :contentReference[oaicite:2]{index=2}
+
+\subsection{2) Permission issues on mounted folders}
+If Nextcloud cannot write to its data:
+\begin{itemize}[leftmargin=*]
+  \item confirm the folders exist under \texttt{/srv/drive/nextcloud/...},
+  \item ensure Docker can write to them.
+\end{itemize}
+
+A common Linux fix:
+
+\begin{lstlisting}
+sudo chown -R $USER:$USER /srv/drive/nextcloud
+\end{lstlisting}
+
+\subsection{3) Works on localhost but not from phone}
+Most common cause: firewall (especially on Windows in Path B).
+Verify you can reach \texttt{SERVER\_IP} from your phone on the same Wi-Fi.
+If you need remote access, use VPN (Appendix~\ref{app:vpn}).
+
+\subsection{4) Background jobs warnings}
+Make sure the \texttt{cron} container is running:
+\begin{lstlisting}
+docker ps
+\end{lstlisting}
+If needed, check logs:
+\begin{lstlisting}
+docker logs --tail=100 nextcloud-cron
+\end{lstlisting}
+
+\section{Remote access options (recommended order)}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{LAN only:} simplest and safest for beginners.
+  \item \textbf{VPN:} safest way to access from anywhere (Appendix~\ref{app:vpn}).
+  \item \textbf{Public internet:} advanced; requires domain + reverse proxy + TLS and careful hardening.
+\end{itemize}
+
+\encourage{Do not rush to public exposure. A private cloud that works reliably on LAN/VPN is already a big win.}
+
+% ===========================
+% OPTIONAL SECTION: ONLYOFFICE
+% ===========================
+\section{Optional: OnlyOffice integration (skip if you do not want online editing)}
+\label{sec:nc_onlyoffice}
+OnlyOffice adds browser-based editing of office documents inside Nextcloud.
+The common approach is:
+\begin{itemize}[leftmargin=*]
+  \item run OnlyOffice Docs (Document Server) as a separate container,
+  \item install the OnlyOffice integration app inside Nextcloud,
+  \item configure the connection (often with a shared JWT secret).
+\end{itemize}
+
+OnlyOffice provides an official integration guide for Nextcloud. :contentReference[oaicite:3]{index=3}
+
+\encourage{Optional means optional. Your Drive works perfectly without this. Add it only if you actually want browser editing.}
+
+\subsection{Step O1 --- Add OnlyOffice Docs to the Compose file}
+Edit your \texttt{docker-compose.yml} and add this service:
+
+\begin{lstlisting}
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: onlyoffice
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      JWT_ENABLED: "true"
+      JWT_SECRET: "CHANGE_THIS_TO_A_LONG_RANDOM_SECRET"
+    ports:
+      - "8081:80"
+\end{lstlisting}
+
+\textbf{Important:}
+\begin{itemize}[leftmargin=*]
+  \item Choose a strong JWT secret and keep it consistent with Nextcloud's OnlyOffice settings.
+  \item We expose OnlyOffice on port 8081 (LAN/VPN). Do not expose it publicly unless you know what you are doing.
+\end{itemize}
+
+Restart:
+
+\begin{lstlisting}
+docker compose down
+docker compose up -d
+\end{lstlisting}
+
+\subsection{Step O2 --- Install the OnlyOffice app in Nextcloud}
+In the Nextcloud web UI:
+\begin{itemize}[leftmargin=*]
+  \item go to \textbf{Apps},
+  \item search for \textbf{ONLYOFFICE},
+  \item install the official connector (app).
+\end{itemize}
+
+\subsection{Step O3 --- Configure the connector}
+In Nextcloud settings for ONLYOFFICE:
+\begin{itemize}[leftmargin=*]
+  \item Document Server address: \texttt{http://onlyoffice/} (internal Docker network) \emph{or} \texttt{http://SERVER\_IP:8081/} (LAN)
+  \item JWT secret: the same value you set in the OnlyOffice container
+\end{itemize}
+
+\textbf{Practical tip:}
+\begin{itemize}[leftmargin=*]
+  \item If you use \texttt{http://onlyoffice/}, Nextcloud talks to OnlyOffice internally (recommended).
+  \item From your browser, you still use Nextcloud normally on port 8080.
+\end{itemize}
+
+\subsection{Verification (OnlyOffice)}
+You are done when:
+\begin{itemize}[leftmargin=*]
+  \item you can create a new document in Nextcloud,
+  \item it opens in the OnlyOffice editor,
+  \item saving works without errors.
+\end{itemize}
+
+\subsection{Common pitfalls (OnlyOffice)}
+\subsubsection*{OnlyOffice ``not available'' / connection errors}
+Most common causes:
+\begin{itemize}[leftmargin=*]
+  \item wrong Document Server URL (internal vs external),
+  \item JWT secret mismatch,
+  \item mixed HTTP/HTTPS assumptions (if you later put Nextcloud behind HTTPS).
+\end{itemize}
+
+\subsubsection*{Self-signed certificates}
+If you later move to HTTPS with self-signed certificates, OnlyOffice may reject them unless configured accordingly. :contentReference[oaicite:4]{index=4}
+
+\section{Next step}
+Next, we build the alternative Drive option: \textbf{Seafile} (Chapter~\ref{ch:seafile}).
+Then you can choose which one matches your needs best (or keep both as documented options). 
