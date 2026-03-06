@@ -37,7 +37,57 @@ jobs:
         run: |
           mkdir public
           cp main.pdf public/main.pdf
-          printf '<!doctype html><html><head><meta http-equiv="refresh" content="0; url=main.pdf"></head><body><a href="main.pdf">Open PDF</a></body></html>' > public/index.html
+
+          cat > public/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Digital Sovereignty Manual – Level 1</title>
+            <meta name="description" content="Step-by-step manual to build a digital sovereignty environment on a server: private cloud, Docker stack, local AI, backups, restore procedures, and troubleshooting.">
+            <meta name="robots" content="index, follow">
+            <link rel="canonical" href="https://mattispin.github.io/digital-sovereignty-manual/">
+          </head>
+          <body>
+            <h1>Digital Sovereignty Manual – Level 1</h1>
+
+            <p>
+              A practical step-by-step manual for building a digital sovereignty environment
+              on a server, including private cloud services, Docker-based deployment,
+              local AI tools, backup and restore workflows, and troubleshooting.
+            </p>
+
+            <p>
+              Topics include self-hosting, digital sovereignty, Docker, private cloud,
+              local AI, Ollama, Open WebUI, backups, restoration, and server administration.
+            </p>
+
+            <p>
+              <a href="main.pdf">Open or download the PDF manual</a>
+            </p>
+          </body>
+          </html>
+          EOF
+
+          cat > public/robots.txt <<'EOF'
+          User-agent: *
+          Allow: /
+
+          Sitemap: https://mattispin.github.io/digital-sovereignty-manual/sitemap.xml
+          EOF
+
+          cat > public/sitemap.xml <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+            <url>
+              <loc>https://mattispin.github.io/digital-sovereignty-manual/</loc>
+            </url>
+            <url>
+              <loc>https://mattispin.github.io/digital-sovereignty-manual/main.pdf</loc>
+            </url>
+          </urlset>
+          EOF
 
       - name: Upload PDF artifact
         if: success()
