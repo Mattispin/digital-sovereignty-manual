@@ -23,9 +23,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
       - name: Install LaTeX
         run: |
           sudo apt-get update
@@ -60,9 +57,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: latex-log
-          path: |
-            main.log
-            *.log
+          path: main.log
 
   deploy:
     needs: build-pdf
