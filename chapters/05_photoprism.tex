@@ -289,6 +289,29 @@ Most browsers let you add the PhotoPrism page to your home screen.
 This creates an icon and opens it in an ``app-like'' full-screen mode.
 Look for \textbf{Share} $\rightarrow$ \textbf{Add to Home Screen} (wording may vary).
 
+\subsection{Uploading photos from a phone}
+
+PhotoPrism itself does not upload photos directly from a mobile phone.
+Images must first arrive on the server filesystem.
+
+There are several possible ways to achieve this.
+
+One option is to use synchronization tools such as \textbf{Syncthing}, which can automatically send photos from a phone to a folder on the server.
+However, Syncthing operates outside the Docker stack used in this manual, so it is not covered here.
+
+In this guide we instead rely on solutions that are already part of the infrastructure described later in the book:
+
+\begin{itemize}
+\item \textbf{Nextcloud}, which provides automatic photo upload through its mobile application.
+\item \textbf{Seafile}, which offers similar synchronization capabilities.
+\end{itemize}
+
+Both options integrate naturally with the server setup presented in the following chapters.
+
+Practical tip:
+For large photo collections, using a dedicated sync tool such as Syncthing can be extremely efficient.
+Advanced users may want to explore this approach independently.
+
 
 \section{Next step}
 Next, we install Navidrome (music server). It is simpler than PhotoPrism:
